@@ -62,6 +62,10 @@ enum OpenMPOffloadingDeclareTargetFlags {
   OMP_DECLARE_TARGET_DTOR = 0x04
 };
 
+struct __tgt_configuration {
+  int32_t env_id;
+};
+
 /// This struct is a record of an entry point or global. For a function
 /// entry point the size is expected to be zero
 struct __tgt_offload_entry {

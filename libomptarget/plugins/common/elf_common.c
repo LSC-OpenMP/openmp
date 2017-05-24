@@ -22,6 +22,64 @@
 #include <elf.h>
 #include <libelf.h>
 
+static inline int32_t dump_data(Elf_Scn* scn, GElf_Shdr shdr) {
+  size_t n = 0;
+  Elf_Data *data = NULL;
+
+  __tgt_configuration *cfg;
+
+  while ( (n < shdr.sh_size) &&
+          (data = elf_getdata(scn, data)) != NULL) {
+    cfg = (__tgt_configuration*) data->d_buf;
+    DP("env_id = %d\n", cfg->env_id);
+  }
+
+  return 1;
+}
+
+static inline int32_t dump_section(Elf* e, Elf_Scn* scn) {
+  GElf_Shdr shdr;
+
+  if (gelf_getshdr(scn , &shdr) != &shdr) {
+    DP("Could not get section data\n");
+
+    return 0;
+  }
+
+  if (shdr.sh_type == SHT_NOBITS)
+    return 1;
+  return dump_data(scn, shdr);
+}
+
+static inline int32_t dump_section_by_name(Elf* e, const char* section_name) {
+  // Find the rodata section offset
+  Elf_Scn *section = 0;
+  Elf64_Off rodata_offset = 0;
+
+  size_t shstrndx;
+
+  if (elf_getshdrstrndx(e, &shstrndx)) {
+    DP("Unable to get ELF strings index!\n");
+
+    return 0;
+  }
+
+  while ((section = elf_nextscn(e, section))) {
+    GElf_Shdr hdr;
+    gelf_getshdr(section, &hdr);
+
+    if (!strcmp(elf_strptr(e, shstrndx, hdr.sh_name), section_name)) {
+      DP("found section name: %s\n", section_name);
+
+      rodata_offset = hdr.sh_addr;
+
+      return dump_section(e, section);
+    }
+  }
+
+  return 0;
+}
+
 // Check whether an image is valid for execution on target_id
 static inline int32_t elf_check_machine(__tgt_device_image *image,
     uint16_t target_id) {
@@ -67,6 +125,8 @@ static inline int32_t elf_check_machine(__tgt_device_image *image,
     elf_end(e);
     return 0;
   }
+
+  dump_section_by_name(e, ".omp_offloading.configuration");
 
   elf_end(e);
   return MachineID == target_id;
