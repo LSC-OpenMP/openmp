@@ -94,9 +94,14 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   
   # Build libomptarget library with libdl dependency.
   add_library(omptarget SHARED ${src_files})
-  target_link_libraries(omptarget
-    dl
-    "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports")
+
+  if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+     target_link_libraries(omptarget omp dl)
+  else()
+    target_link_libraries(omptarget
+      dl
+      "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports")
+  endif()
   
   # Install libomptarget under the lib destination folder.
   install(TARGETS omptarget LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
