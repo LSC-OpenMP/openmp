@@ -1,11 +1,17 @@
 # circle.yml
 machine:
   environment:
+    LLVM_SRC: "$HOME/llvm"
+    CLANG_SRC: "$HOME/clang"
+    OPENMP_SRC: "$HOME/openmp"
     PATH: "$HOME/cmake-3.7.2-Linux-x86_64/bin:$PATH"
 
 dependencies:
   cache_directories:
     - $HOME/cmake-3.7.2-Linux-x86_64
+  pre:
+    - git clone --depth 1 git://github.com/lsc-openmp/llvm.git $LLVM_SRC
+    - git clone --depth 1 git://github.com/lsc-openmp/clang.git $CLANG_SRC
   override:
     - >
       if [ ! -d $HOME/cmake-3.7.2-Linux-x86_64 ]; then
@@ -16,7 +22,10 @@ dependencies:
       fi
 
 test:
+  pre:
+    - cp -R $CLANG_SRC $LLVM_SRC/tools/
+    - cp -R $OPENMP_SRC $LLVM_SRC/projects/
   override:
     - mkdir build
-    - cd build && cmake ..
+    - cd build && cmake $LLVM_SRC -DLLVM_TARGETS_TO_BUILD="X86" -DCMAKE_BUILD_TYPE=Release
     - cd build && make
