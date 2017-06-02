@@ -32,6 +32,7 @@ tags
 /GSYMS
 /GTAGS
 .gitusers
+CMakeLists.txt.user
 
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
