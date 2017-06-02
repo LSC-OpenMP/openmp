@@ -12,6 +12,7 @@ dependencies:
   pre:
     - git clone --depth 1 git://github.com/lsc-openmp/llvm.git $LLVM_SRC
     - git clone --depth 1 git://github.com/lsc-openmp/clang.git $CLANG_SRC
+    - sudo apt-get update; sudo apt-get install libelf-dev
   override:
     - >
       if [ ! -d $HOME/cmake-3.7.2-Linux-x86_64 ]; then
