@@ -22,7 +22,9 @@
 #include <elf.h>
 #include <libelf.h>
 
-static inline int32_t dump_data(Elf_Scn* scn, GElf_Shdr shdr) {
+static inline int32_t dump_data(Elf_Scn* scn,
+                                GElf_Shdr shdr,
+                                const char *img_begin) {
   size_t n = 0;
   Elf_Data *data = NULL;
 
@@ -30,14 +32,30 @@ static inline int32_t dump_data(Elf_Scn* scn, GElf_Shdr shdr) {
 
   while ( (n < shdr.sh_size) &&
           (data = elf_getdata(scn, data)) != NULL) {
+    int i;
+    char *module = NULL;
+
     cfg = (__tgt_configuration*) data->d_buf;
     DP("env_id = %d\n", cfg->env_id);
+
+    // string constant pointer to .rodata section of elf (img_begin)
+    for(i = 0; *(img_begin + (intptr_t)cfg->module + i) != '\0'; i++) {
+      module = (char*) realloc(module, (i + 1));
+      module[i] = *(img_begin + (intptr_t)cfg->module + i);
+    }
+    module = (char*) realloc(module, (i + 1));
+    module[i] = '\0';
+
+    /* cfg->module = module; */
+    DP("module = %s\n", module);
   }
 
   return 1;
 }
 
-static inline int32_t dump_section(Elf* e, Elf_Scn* scn) {
+static inline int32_t dump_section(Elf* e,
+                                   Elf_Scn* scn,
+                                   const char* img_begin) {
   GElf_Shdr shdr;
 
   if (gelf_getshdr(scn , &shdr) != &shdr) {
@@ -48,13 +66,14 @@ static inline int32_t dump_section(Elf* e, Elf_Scn* scn) {
 
   if (shdr.sh_type == SHT_NOBITS)
     return 1;
-  return dump_data(scn, shdr);
+  return dump_data(scn, shdr, img_begin);
 }
 
-static inline int32_t dump_section_by_name(Elf* e, const char* section_name) {
+static inline int32_t dump_section_by_name(Elf* e,
+                                           const char* section_name,
+                                           const char* img_begin) {
   // Find the rodata section offset
   Elf_Scn *section = 0;
-  Elf64_Off rodata_offset = 0;
 
   size_t shstrndx;
 
@@ -71,9 +90,7 @@ static inline int32_t dump_section_by_name(Elf* e, const char* section_name) {
     if (!strcmp(elf_strptr(e, shstrndx, hdr.sh_name), section_name)) {
       DP("found section name: %s\n", section_name);
 
-      rodata_offset = hdr.sh_addr;
-
-      return dump_section(e, section);
+      return dump_section(e, section, img_begin);
     }
   }
 
@@ -126,7 +143,7 @@ static inline int32_t elf_check_machine(__tgt_device_image *image,
     return 0;
   }
 
-  dump_section_by_name(e, ".omp_offloading.configuration");
+  dump_section_by_name(e, ".omp_offloading.configuration", img_begin);
 
   elf_end(e);
   return MachineID == target_id;
