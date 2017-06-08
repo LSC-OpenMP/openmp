@@ -30,3 +30,5 @@ test:
     - mkdir build
     - cd build && cmake $LLVM_SRC -DLLVM_TARGETS_TO_BUILD="X86" -DCMAKE_BUILD_TYPE=Release
     - cd build && make
+  post:
+    - cd build && make check-libomptarget
