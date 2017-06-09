@@ -16,6 +16,10 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <dlfcn.h>
+#include <ffi.h>
+#include <gelf.h>
+#include <link.h>
 
 #include "omptarget.h"
 
@@ -28,6 +32,9 @@
 #define DP(...) DEBUGP("Target " GETNAME(TARGET_NAME) " RTL", __VA_ARGS__)
 
 #include "../../common/elf_common.c"
+
+#define NUMBER_OF_DEVICES 1
+#define OFFLOADSECTIONNAME ".omp_offloading.entries"
 
 // Utility for retrieving and printing SMARTNIC error string.
 #ifdef SMARTNIC_ERROR_REPORT
@@ -42,10 +49,15 @@
   {}
 #endif
 
+/// Array of Dynamic libraries loaded for this target.
+struct DynLibTy {
+  char *FileName;
+  void *Handle;
+};
+
 /// Keep entries table per device.
 struct FuncOrGblEntryTy {
   __tgt_target_table Table;
-  std::vector<__tgt_offload_entry> Entries;
 };
 
 /// Class containing all the device information.
@@ -53,144 +65,245 @@ class RTLDeviceInfoTy {
   std::vector<FuncOrGblEntryTy> FuncGblEntries;
 
 public:
-  int NumberOfDevices;
 
-  // Device properties
-  std::vector<int> ThreadsPerBlock;
-  std::vector<int> BlocksPerGrid;
-  std::vector<int> WarpSize;
+  std::list<DynLibTy> DynLibs;
 
-  // OpenMP properties
-  std::vector<int> NumTeams;
-  std::vector<int> NumThreads;
-
-  // OpenMP Environment properties
-  int EnvNumTeams;
-  int EnvTeamLimit;
-
-  //static int EnvNumThreads;
-  static const int HardTeamLimit = 1<<16; // 64k
-  static const int HardThreadLimit = 1024;
-  static const int DefaultNumTeams = 128;
-  static const int DefaultNumThreads = 128;
-
-  // Record entry point associated with device
-  void addOffloadEntry(int32_t device_id, __tgt_offload_entry entry) {
+  // Record entry point associated with device.
+  void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin,
+                          __tgt_offload_entry *end) {
     assert(device_id < (int32_t)FuncGblEntries.size() &&
            "Unexpected device id!");
     FuncOrGblEntryTy &E = FuncGblEntries[device_id];
 
-    E.Entries.push_back(entry);
+    E.Table.EntriesBegin = begin;
+    E.Table.EntriesEnd = end;
   }
 
-  // Return true if the entry is associated with device
+  // Return true if the entry is associated with device.
   bool findOffloadEntry(int32_t device_id, void *addr) {
     assert(device_id < (int32_t)FuncGblEntries.size() &&
            "Unexpected device id!");
     FuncOrGblEntryTy &E = FuncGblEntries[device_id];
 
-    for (auto &it : E.Entries) {
-      if (it.addr == addr)
+    for (__tgt_offload_entry *i = E.Table.EntriesBegin, *e = E.Table.EntriesEnd;
+         i < e; ++i) {
+      if (i->addr == addr)
         return true;
     }
 
     return false;
   }
 
-  // Return the pointer to the target entries table
+  // Return the pointer to the target entries table.
   __tgt_target_table *getOffloadEntriesTable(int32_t device_id) {
     assert(device_id < (int32_t)FuncGblEntries.size() &&
            "Unexpected device id!");
     FuncOrGblEntryTy &E = FuncGblEntries[device_id];
 
-    int32_t size = E.Entries.size();
-
-    // Table is empty
-    if (!size)
-      return 0;
-
-    __tgt_offload_entry *begin = &E.Entries[0];
-    __tgt_offload_entry *end = &E.Entries[size - 1];
-
-    // Update table info according to the entries and return the pointer
-    E.Table.EntriesBegin = begin;
-    E.Table.EntriesEnd = ++end;
-
     return &E.Table;
   }
 
-  // Clear entries table for a device
-  void clearOffloadEntriesTable(int32_t device_id) {
-    assert(device_id < (int32_t)FuncGblEntries.size() &&
-           "Unexpected device id!");
-    FuncOrGblEntryTy &E = FuncGblEntries[device_id];
-    E.Entries.clear();
-    E.Table.EntriesBegin = E.Table.EntriesEnd = 0;
-  }
-
-  RTLDeviceInfoTy() {
-    DP("Start SMARTNIC\n");
-
-    NumberOfDevices = 1;
-
-    // Get environment variables regarding teams
-    char *envStr = getenv("OMP_TEAM_LIMIT");
-    if (envStr) {
-      // OMP_TEAM_LIMIT has been set
-      EnvTeamLimit = std::stoi(envStr);
-      DP("Parsed OMP_TEAM_LIMIT=%d\n", EnvTeamLimit);
-    } else {
-      EnvTeamLimit = -1;
-    }
-    envStr = getenv("OMP_NUM_TEAMS");
-    if (envStr) {
-      // OMP_NUM_TEAMS has been set
-      EnvNumTeams = std::stoi(envStr);
-      DP("Parsed OMP_NUM_TEAMS=%d\n", EnvNumTeams);
-    } else {
-      EnvNumTeams = -1;
-    }
-  }
+  RTLDeviceInfoTy(int32_t num_devices) { FuncGblEntries.resize(num_devices); }
 
   ~RTLDeviceInfoTy() {
-    DP("Finish SMARTNIC\n");
+    // Close dynamic libraries
+    for (auto &lib : DynLibs) {
+      if (lib.Handle) {
+        dlclose(lib.Handle);
+        remove(lib.FileName);
+      }
+    }
   }
 };
 
-static RTLDeviceInfoTy DeviceInfo;
+static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
-  // return elf_check_machine(image, EM_X86_64, 11);
-  return 1;
+  uint32_t is_valid_binary = elf_check_machine(image, EM_X86_64, 11);
+
+  // TODO(ciroc): extract struct information
+  if (is_valid_binary) {
+    __tgt_configuration *cfg;
+    int i;
+    char *module = NULL;
+    char *img_begin = (char *)image->ImageStart;
+
+    get_tgt_configuration_module(image, &cfg);
+
+    // string constant pointer to .rodata section of elf (img_begin)
+    for(i = 0; *(img_begin + (intptr_t)cfg->module + i) != '\0'; i++) {
+      module = (char*) realloc(module, (i + 1));
+      module[i] = *(img_begin + (intptr_t)cfg->module + i);
+    }
+    module = (char*) realloc(module, (i + 1));
+    module[i] = '\0';
+
+    DP("[smartnic] sub_target_id = %d\n", cfg->sub_target_id);
+    DP("[smartnic] module = %s\n", module);
+
+    free(module);
+  }
+
+  return is_valid_binary;
 }
 
-int32_t __tgt_rtl_number_of_devices() { return 1; }
+int32_t __tgt_rtl_number_of_devices() {
+  return NUMBER_OF_DEVICES;
+}
 
 int32_t __tgt_rtl_init_device(int32_t device_id) {
 
-  printf("[smartnic] __tgt_rtl_init_device\n");
+  DP("[smartnic] __tgt_rtl_init_device\n");
 
   return OFFLOAD_SUCCESS;
 }
 
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
-    __tgt_device_image *image) {
+                                          __tgt_device_image *image) {
 
-  printf("[smartnic] __tgt_rtl_load_binary\n");
+  DP("Dev %d: load binary from " DPxMOD " image\n", device_id,
+     DPxPTR(image->ImageStart));
 
-  return NULL;
+  assert(device_id >= 0 && device_id < NUMBER_OF_DEVICES && "bad dev id");
+
+  size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
+  size_t NumEntries = (size_t)(image->EntriesEnd - image->EntriesBegin);
+  DP("Expecting to have %zd entries defined.\n", NumEntries);
+
+  // Is the library version incompatible with the header file?
+  if (elf_version(EV_CURRENT) == EV_NONE) {
+    DP("Incompatible ELF library!\n");
+    return NULL;
+  }
+
+  // Obtain elf handler
+  Elf *e = elf_memory((char *)image->ImageStart, ImageSize);
+  if (!e) {
+    DP("Unable to get ELF handle: %s!\n", elf_errmsg(-1));
+    return NULL;
+  }
+
+  if (elf_kind(e) != ELF_K_ELF) {
+    DP("Invalid Elf kind!\n");
+    elf_end(e);
+    return NULL;
+  }
+
+  // Find the entries section offset
+  Elf_Scn *section = 0;
+  Elf64_Off entries_offset = 0;
+
+  size_t shstrndx;
+
+  if (elf_getshdrstrndx(e, &shstrndx)) {
+    DP("Unable to get ELF strings index!\n");
+    elf_end(e);
+    return NULL;
+  }
+
+  while ((section = elf_nextscn(e, section))) {
+    GElf_Shdr hdr;
+    gelf_getshdr(section, &hdr);
+
+    if (!strcmp(elf_strptr(e, shstrndx, hdr.sh_name), OFFLOADSECTIONNAME)) {
+      entries_offset = hdr.sh_addr;
+      break;
+    }
+  }
+
+  if (!entries_offset) {
+    DP("Entries Section Offset Not Found\n");
+    elf_end(e);
+    return NULL;
+  }
+
+  DP("Offset of entries section is (" DPxMOD ").\n", DPxPTR(entries_offset));
+
+  // load dynamic library and get the entry points. We use the dl library
+  // to do the loading of the library, but we could do it directly to avoid the
+  // dump to the temporary file.
+  //
+  // 1) Create tmp file with the library contents.
+  // 2) Use dlopen to load the file and dlsym to retrieve the symbols.
+  char tmp_name[] = "/tmp/tmpfile_XXXXXX";
+  int tmp_fd = mkstemp(tmp_name);
+
+  if (tmp_fd == -1) {
+    elf_end(e);
+    return NULL;
+  }
+
+  FILE *ftmp = fdopen(tmp_fd, "wb");
+
+  if (!ftmp) {
+    elf_end(e);
+    return NULL;
+  }
+
+  fwrite(image->ImageStart, ImageSize, 1, ftmp);
+  fclose(ftmp);
+
+  DynLibTy Lib = {tmp_name, dlopen(tmp_name, RTLD_LAZY)};
+
+  if (!Lib.Handle) {
+    DP("Target library loading error: %s\n", dlerror());
+    elf_end(e);
+    return NULL;
+  }
+
+  DeviceInfo.DynLibs.push_back(Lib);
+
+  struct link_map *libInfo = (struct link_map *)Lib.Handle;
+
+  // The place where the entries info is loaded is the library base address
+  // plus the offset determined from the ELF file.
+  Elf64_Addr entries_addr = libInfo->l_addr + entries_offset;
+
+  DP("Pointer to first entry to be loaded is (" DPxMOD ").\n",
+      DPxPTR(entries_addr));
+
+  // Table of pointers to all the entries in the target.
+  __tgt_offload_entry *entries_table = (__tgt_offload_entry *)entries_addr;
+
+  __tgt_offload_entry *entries_begin = &entries_table[0];
+  __tgt_offload_entry *entries_end = entries_begin + NumEntries;
+
+  if (!entries_begin) {
+    DP("Can't obtain entries begin\n");
+    elf_end(e);
+    return NULL;
+  }
+
+  DP("Entries table range is (" DPxMOD ")->(" DPxMOD ")\n",
+      DPxPTR(entries_begin), DPxPTR(entries_end));
+  DeviceInfo.createOffloadTable(device_id, entries_begin, entries_end);
+
+  elf_end(e);
+
+  return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size) {
-  return NULL;
+  DP("[smartnic] __tgt_rtl_data_alloc\n");
+  void *ptr = malloc(size);
+
+  return ptr;
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     int64_t size) {
+
+  int* ptr = static_cast<int*>(hst_ptr);
+
+  DP("[smartnic] __tgt_rtl_data_submit: %d\n", size);
+
+  for (int i = 0; i < size/sizeof(int); i++) {
+    DP("[smartnic] __tgt_rtl_data_submit[%d]: %d\n", i, ptr[i]);
+  }
 
   return OFFLOAD_SUCCESS;
 }
@@ -198,10 +311,22 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     int64_t size) {
 
+  int* ptr = static_cast<int*>(hst_ptr);
+
+  DP("[smartnic] __tgt_rtl_data_retrieve\n");
+
+  for (int i = 0; i < size/sizeof(int); i++) {
+    ptr[i] = 200 + i;
+  }
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
+
+  DP("[smartnic] __tgt_rtl_delete\n");
+
+  free(tgt_ptr);
 
   return OFFLOAD_SUCCESS;
 }
@@ -210,16 +335,17 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit,
     uint64_t loop_tripcount) {
 
+  DP("[smartnic] __tgt_rtl_run_target_team_region\n");
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
     void **tgt_args, int32_t arg_num) {
 
-  return OFFLOAD_SUCCESS;
+  DP("[smartnic] __tgt_rtl_run_target_region\n");
 
-  // return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
-  //     arg_num, team_num, thread_limit, 0);
+  return OFFLOAD_SUCCESS;
 }
 
 #ifdef __cplusplus
