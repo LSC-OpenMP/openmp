@@ -63,7 +63,8 @@ enum OpenMPOffloadingDeclareTargetFlags {
 };
 
 struct __tgt_configuration {
-  int32_t env_id;
+  int32_t sub_target_id;
+  char *module;
 };
 
 /// This struct is a record of an entry point or global. For a function
