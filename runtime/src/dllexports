@@ -393,8 +393,10 @@ kmpc_set_defaults                           224
         __kmpc_doacross_fini                264
         __kmpc_taskloop                     266
     %endif
-  __kmpc_reduce41                           261
-  __kmpc_end_reduce41                       262
+  # NOTES(ciroceissler): change reduce41 to 270 (conflict) 
+  #                      and comment end_reduce41
+  __kmpc_reduce41                           270
+  # __kmpc_end_reduce41                       262
 %endif
 kmpc_aligned_malloc                         265
 kmpc_set_disp_num_buffers                   267

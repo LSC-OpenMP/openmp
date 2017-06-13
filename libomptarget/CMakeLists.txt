@@ -99,7 +99,11 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
     "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports")
   
   # Install libomptarget under the lib destination folder.
-  install(TARGETS omptarget LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+  if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    install(TARGETS omptarget RUNTIME DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+  else()
+    install(TARGETS omptarget LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+  endif()
   
   # Retrieve the path to the resulting library so that it can be used for 
   # testing.

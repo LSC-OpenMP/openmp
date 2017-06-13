@@ -27,7 +27,11 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
     add_library(omptarget.rtl.smartnic SHARED src/rtl.cpp)
 
     # Install plugin under the lib destination folder.
-    install(TARGETS omptarget.rtl.smartnic LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+    if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+      install(TARGETS omptarget.rtl.smartnic RUNTIME DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+    else()
+      install(TARGETS omptarget.rtl.smartnic LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+    endif()
 
     target_link_libraries(omptarget.rtl.smartnic
       ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
