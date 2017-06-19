@@ -16,7 +16,6 @@
 #include <list>
 #include <string>
 #include <vector>
-#include <dlfcn.h>
 #include <ffi.h>
 #include <gelf.h>
 #include <link.h>

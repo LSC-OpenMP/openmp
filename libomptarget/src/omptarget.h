@@ -25,6 +25,14 @@
 #define OFFLOAD_DEVICE_DESTRUCTOR  -3
 #define HOST_DEVICE                -10
 
+#if defined(_MSC_VER)  //  Microsoft compiler
+  #include <windows.h>
+  #define SHARED_LIBRARY_SUFFIX .dll
+#else  //  otherwise
+  #include <dlfcn.h>
+  #define SHARED_LIBRARY_SUFFIX .so
+#endif  //  _MSC_VER
+
 /// Data attributes for each data reference used in an OpenMP target region.
 enum tgt_map_type {
   // No flags

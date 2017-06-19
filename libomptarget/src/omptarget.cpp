@@ -17,7 +17,6 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
-#include <dlfcn.h>
 #include <list>
 #include <map>
 #include <mutex>
@@ -33,11 +32,11 @@
 
 // List of all plugins that can support offloading.
 static const char *RTLNames[] = {
-    /* PowerPC target  */ "libomptarget.rtl.ppc64.so",
-    /* x86_64 target   */ "libomptarget.rtl.x86_64.so",
-    /* CUDA target     */ "libomptarget.rtl.cuda.so",
-    /* AArch64 target  */ "libomptarget.rtl.aarch64.so",
-    /* SmartNIC target */ "libomptarget.rtl.smartnic.so"};
+    /* PowerPC target  */ "libomptarget.rtl.ppc64." SHARED_LIBRARY_SUFFIX,
+    /* x86_64 target   */ "libomptarget.rtl.x86_64." SHARED_LIBRARY_SUFFIX,
+    /* CUDA target     */ "libomptarget.rtl.cuda." SHARED_LIBRARY_SUFFIX,
+    /* AArch64 target  */ "libomptarget.rtl.aarch64." SHARED_LIBRARY_SUFFIX,
+    /* SmartNIC target */ "libomptarget.rtl.smartnic." SHARED_LIBRARY_SUFFIX};
 
 // forward declarations
 struct RTLInfoTy;
