@@ -19,6 +19,11 @@
 #include <ffi.h>
 #include <gelf.h>
 #include <link.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 #include "omptarget.h"
 
@@ -57,6 +62,160 @@ struct DynLibTy {
 /// Keep entries table per device.
 struct FuncOrGblEntryTy {
   __tgt_target_table Table;
+};
+
+/// Class to handle socket.
+class SocketHandle {
+ private:
+  int sockfd;
+  int portno;
+  int conn_status;
+  struct sockaddr_in serv_addr;
+  struct hostent *server;
+
+  inline void send_ack() {
+    if (send(this->sockfd, "ack", 3, 0) < 0) {
+      DP("[smartnic] error writing ack to socket\n");
+      throw -1;
+    }
+  }
+
+  inline void get_ack() {
+    char buffer[3];
+
+    bzero(buffer, 3);
+    if (recv(this->sockfd, buffer, 3, 0) < 0) {
+      DP("[smartnic] error reading ack from socket\n");
+      throw -1;
+    }
+
+    if (buffer[0] != 'a' || buffer[1] != 'c' || buffer[2] != 'k') {
+      DP("[smartnic] error not received ack message\n");
+      throw -1;
+    }
+
+    DP("[smartnic] ack received!\n");
+  }
+
+  inline void send_cmd(char cmd) {
+    char buffer[1];
+
+    buffer[0] = cmd;
+
+    if (send(this->sockfd, buffer, 1, 0) < 0) {
+      DP("[smartnic] error cmd from socket!\n");
+      throw -1;
+    }
+
+    this->get_ack();
+  }
+
+  inline void send_data(void *data, int64_t size) {
+    if (send(this->sockfd, data, size, 0) < 0) {
+      DP("[smartnic] send data error!\n");
+      throw -1;
+    }
+
+    this->get_ack();
+  }
+
+  inline void recv_data(void *data, int64_t size) {
+    if (recv(this->sockfd, data, size, 0) < 0) {
+      DP("[smartnic] recv data error!\n");
+      throw -1;
+    }
+
+    this->send_ack();
+  }
+
+ public:
+  int conn() {
+    this->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0) {
+      DP("[smartnic] error - opening the socket!");
+      return -1;
+    }
+
+    server = gethostbyname("falcon");
+
+    if (server == NULL) {
+      DP("[smartnic] error - no such host!");
+      return -1;
+    }
+
+    bzero((char *) &this->serv_addr, sizeof(serv_addr));
+
+    this->serv_addr.sin_family = AF_INET;
+
+    bcopy((char *)this->server->h_addr,
+          (char *)&this->serv_addr.sin_addr.s_addr,
+          this->server->h_length);
+
+    this->serv_addr.sin_port = htons(this->portno);
+
+    conn_status = connect(this->sockfd,
+                          (struct sockaddr *) &this->serv_addr,
+                          sizeof(this->serv_addr));
+
+    return conn_status;
+  }
+
+  int write(void *data, int64_t size) {
+    int write_status = 1;
+
+    assert(size > 0);
+
+    try {
+      this->send_cmd('w');
+      this->send_data(data, size);
+    } catch (int e) {
+      write_status = e;
+    }
+
+    return write_status;
+  }
+
+  int read(void *data, int64_t size) {
+    int read_status = 1;
+
+    assert(size > 0);
+
+    try {
+      this->send_cmd('r');
+      this->send_data(reinterpret_cast<void*>(&size), 8);
+      this->recv_data(data, size);
+    } catch (int e) {
+      read_status = e;
+    }
+
+    return read_status;
+  }
+
+  void disconnect() {
+    close(this->sockfd);
+  }
+
+  int get_conn_status() {
+    return conn_status;
+  }
+
+  SocketHandle() {
+    this->portno = 51717;
+    this->conn_status = -1;
+
+    this->conn();
+  }
+
+  SocketHandle(int portno) {
+    this->portno = portno;
+    this->conn_status = -1;
+  }
+
+  ~SocketHandle() {
+    DP("[smartnic] socket closed\n");
+    close(this->sockfd);
+  }
 };
 
 /// Class containing all the device information.
@@ -116,6 +275,7 @@ public:
 };
 
 static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
+static SocketHandle    socket_handle;
 
 #ifdef __cplusplus
 extern "C" {
@@ -157,6 +317,10 @@ int32_t __tgt_rtl_number_of_devices() {
 int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   DP("[smartnic] __tgt_rtl_init_device\n");
+
+  if (socket_handle.get_conn_status() < 0) {
+    return OFFLOAD_FAIL;
+  }
 
   return OFFLOAD_SUCCESS;
 }
@@ -296,13 +460,9 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size) {
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     int64_t size) {
 
-  int* ptr = static_cast<int*>(hst_ptr);
-
   DP("[smartnic] __tgt_rtl_data_submit: %d\n", size);
 
-  for (int i = 0; i < size/sizeof(int); i++) {
-    DP("[smartnic] __tgt_rtl_data_submit[%d]: %d\n", i, ptr[i]);
-  }
+  socket_handle.write(hst_ptr, size);
 
   return OFFLOAD_SUCCESS;
 }
@@ -314,9 +474,7 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
   DP("[smartnic] __tgt_rtl_data_retrieve\n");
 
-  for (int i = 0; i < size/sizeof(int); i++) {
-    ptr[i] = 200 + i;
-  }
+  socket_handle.read(hst_ptr, size);
 
   return OFFLOAD_SUCCESS;
 }
@@ -336,6 +494,8 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   DP("[smartnic] __tgt_rtl_run_target_team_region\n");
 
+  // TODO(ciroceissler): send fpga information);
+
   return OFFLOAD_SUCCESS;
 }
 
@@ -344,7 +504,9 @@ int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
 
   DP("[smartnic] __tgt_rtl_run_target_region\n");
 
-  return OFFLOAD_SUCCESS;
+  // use one team and one thread.
+  return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
+                                          arg_num, 1, 1, 0);
 }
 
 #ifdef __cplusplus
