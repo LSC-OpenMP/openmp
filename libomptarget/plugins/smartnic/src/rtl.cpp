@@ -244,7 +244,7 @@ public:
       memcpy(last_module, module, strlen(module));
 
       this->socket_handle->program(reinterpret_cast<void*>(module),
-                                   strlen(module));
+                                   strlen(module) + 1);
 
       DP("[fpga_info] programming FPGA - %s\n", last_module);
     }
