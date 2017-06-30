@@ -33,23 +33,7 @@ static inline int32_t map_tgt_configuration(Elf_Scn* section,
 
   while ( (n < shdr.sh_size) &&
           (data = elf_getdata(section, data)) != NULL) {
-    int i;
-    /* char *module = NULL; */
-
     *cfg = (__tgt_configuration*) data->d_buf;
-
-    /* // string constant pointer to .rodata section of elf (img_begin) */
-    /* for(i = 0; *(img_begin + (intptr_t)(*cfg)->module + i) != '\0'; i++) { */
-    /*   module = (char*) realloc(module, (i + 1)); */
-    /*   module[i] = *(img_begin + (intptr_t)(*cfg)->module + i); */
-    /* } */
-    /* module = (char*) realloc(module, (i + 1)); */
-    /* module[i] = '\0'; */
-    /*  */
-    /* #<{(| (*cfg)->module = module; |)}># */
-    /* DP("module = %s\n", module); */
-
-    /* free(module); */
   }
 
   return 1;
@@ -190,7 +174,6 @@ static inline int32_t elf_check_machine(__tgt_device_image *image,
 static inline int32_t get_tgt_configuration_module(__tgt_device_image *image,
                                                    __tgt_configuration **cfg) {
 
-  char *module = NULL;
   int is_success = 1;
   Elf_Scn* section = 0;
   GElf_Shdr shdr;
@@ -209,18 +192,8 @@ static inline int32_t get_tgt_configuration_module(__tgt_device_image *image,
   if (!is_success || !map_tgt_configuration(section, shdr, img_begin, cfg))
     is_success = 3;
 
-  /* // string constant pointer to .rodata section of elf (img_begin) */
-  /* for(i = 0; *(img_begin + (intptr_t)cfg->module + i) != '\0'; i++) { */
-  /*   module = (char*) realloc(module, (i + 1)); */
-  /*   module[i] = *(img_begin + (intptr_t)cfg->module + i); */
-  /* } */
-  /* module = (char*) realloc(module, (i + 1)); */
-  /* module[i] = '\0'; */
-  /*  */
-  /* #<{(| (*cfg)->module = module; |)}># */
-  /* DP("module = %s\n", module); */
-
   elf_end(e);
 
   return is_success;
 }
+

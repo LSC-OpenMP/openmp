@@ -24,6 +24,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 
 #include "omptarget.h"
 
@@ -137,21 +138,10 @@ class SocketHandle {
       return -1;
     }
 
-    server = gethostbyname("falcon");
-
-    if (server == NULL) {
-      DP("[smartnic] error - no such host!");
-      return -1;
-    }
-
     bzero((char *) &this->serv_addr, sizeof(serv_addr));
 
+    inet_pton(AF_INET, "127.0.0.1", &(this->serv_addr.sin_addr));
     this->serv_addr.sin_family = AF_INET;
-
-    bcopy((char *)this->server->h_addr,
-          (char *)&this->serv_addr.sin_addr.s_addr,
-          this->server->h_length);
-
     this->serv_addr.sin_port = htons(this->portno);
 
     conn_status = connect(this->sockfd,
@@ -174,6 +164,21 @@ class SocketHandle {
     }
 
     return write_status;
+  }
+
+  int program(void *data, int64_t size) {
+    int program_status = 1;
+
+    assert(size > 0);
+
+    try {
+      this->send_cmd('p');
+      this->send_data(data, size);
+    } catch (int e) {
+      program_status = e;
+    }
+
+    return program_status;
   }
 
   int read(void *data, int64_t size) {
@@ -215,6 +220,37 @@ class SocketHandle {
   ~SocketHandle() {
     DP("[smartnic] socket closed\n");
     close(this->sockfd);
+  }
+};
+
+/// Class containing FPGA information
+class FPGAInfo {
+private:
+  SocketHandle *socket_handle;
+  char *last_module;
+
+public:
+
+  void program_fpga(char *module) {
+    if (last_module == NULL || strcmp(module, last_module) != 0) {
+      last_module = (char*) realloc(last_module, sizeof(module));
+
+      memcpy(last_module, module, strlen(module));
+
+      this->socket_handle->program(reinterpret_cast<void*>(module),
+                                   strlen(module));
+
+      DP("[fpga_info] programming FPGA - %s\n", last_module);
+    }
+  }
+
+  FPGAInfo(SocketHandle *socket_handle) {
+    this->last_module = NULL;
+    this->socket_handle = socket_handle;
+  }
+
+  ~FPGAInfo() {
+    free(this->last_module);
   }
 };
 
@@ -276,6 +312,7 @@ public:
 
 static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
 static SocketHandle    socket_handle;
+static FPGAInfo        fpga_info(&socket_handle);
 
 #ifdef __cplusplus
 extern "C" {
@@ -300,6 +337,8 @@ int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
     }
     module = (char*) realloc(module, (i + 1));
     module[i] = '\0';
+
+    fpga_info.program_fpga(module);
 
     DP("[smartnic] sub_target_id = %d\n", cfg->sub_target_id);
     DP("[smartnic] module = %s\n", module);
@@ -470,8 +509,6 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     int64_t size) {
 
-  int* ptr = static_cast<int*>(hst_ptr);
-
   DP("[smartnic] __tgt_rtl_data_retrieve\n");
 
   socket_handle.read(hst_ptr, size);
@@ -493,8 +530,6 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     uint64_t loop_tripcount) {
 
   DP("[smartnic] __tgt_rtl_run_target_team_region\n");
-
-  // TODO(ciroceissler): send fpga information);
 
   return OFFLOAD_SUCCESS;
 }
