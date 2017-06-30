@@ -198,6 +198,9 @@ class SocketHandle {
   }
 
   void disconnect() {
+    this->send_cmd('q');
+    this->send_ack();
+
     close(this->sockfd);
   }
 
@@ -219,6 +222,9 @@ class SocketHandle {
 
   ~SocketHandle() {
     DP("[smartnic] socket closed\n");
+    this->send_cmd('q');
+    this->send_ack();
+
     close(this->sockfd);
   }
 };
