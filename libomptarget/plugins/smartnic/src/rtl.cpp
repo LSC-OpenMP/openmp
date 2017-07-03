@@ -121,10 +121,16 @@ class SocketHandle {
   }
 
   inline void recv_data(void *data, int64_t size) {
-    if (recv(this->sockfd, data, size, 0) < 0) {
-      DP("[smartnic] recv data error!\n");
-      throw -1;
-    }
+    ssize_t recv_bytes = 0;
+
+    do {
+      recv_bytes += recv(this->sockfd, data + recv_bytes, size, 0);
+
+      if (recv_bytes < 0) {
+        DP("[smartnic] recv data error!\n");
+        throw -1;
+      }
+    } while(recv_bytes != size);
 
     this->send_ack();
   }
@@ -158,6 +164,7 @@ class SocketHandle {
 
     try {
       this->send_cmd('w');
+      this->send_data(reinterpret_cast<void*>(&size), 8);
       this->send_data(data, size);
     } catch (int e) {
       write_status = e;
