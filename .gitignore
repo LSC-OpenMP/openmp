@@ -21,6 +21,31 @@
 #OS X specific files.
 .DS_store
 
+.cproject
+.project
+.settings
+
+#Useful for scala
+*.class
+*.log
+
+# sbt specific
+build.properties
+.cache*
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+.classpath
+
 #==============================================================================#
 # Explicit files to ignore (only matches one).
 #==============================================================================#
