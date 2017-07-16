@@ -105,7 +105,9 @@ static inline int32_t check_devices(Elf *e,
       has_failed = 3;
 
     if (0 == has_failed) {
-      DP("sub_target_id = %d\n", cfg->sub_target_id);
+      DP("sub_target_id = %d | cfg->sub_target_id = %d\n",
+          sub_target_id,
+          cfg->sub_target_id);
       /* DP("module = %s\n", cfg->module); */
       sub_target_check = (sub_target_id == cfg->sub_target_id);
     } else {

@@ -241,10 +241,19 @@ class FPGAInfo {
 private:
   SocketHandle *socket_handle;
   char *last_module;
+  char *module;
 
 public:
 
-  void program_fpga(char *module) {
+  void set_module(char *module) {
+    this->module = (char*) realloc(last_module, sizeof(module));
+    memcpy(this->module, module, strlen(module));
+  }
+
+  void program_fpga() {
+    if (strlen(module) == 0)
+      return;
+
     if (last_module == NULL || strcmp(module, last_module) != 0) {
       last_module = (char*) realloc(last_module, sizeof(module));
 
@@ -332,7 +341,7 @@ extern "C" {
 #endif
 
 int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
-  uint32_t is_valid_binary = elf_check_machine(image, EM_X86_64, 11);
+  uint32_t is_valid_binary = elf_check_machine(image, EM_X86_64, 9001);
 
   // TODO(ciroc): extract struct information
   if (is_valid_binary) {
@@ -351,7 +360,7 @@ int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
     module = (char*) realloc(module, (i + 1));
     module[i] = '\0';
 
-    fpga_info.program_fpga(module);
+    fpga_info.set_module(module);
 
     DP("[smartnic] sub_target_id = %d\n", cfg->sub_target_id);
     DP("[smartnic] module = %s\n", module);
@@ -373,6 +382,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   if (socket_handle.get_conn_status() < 0) {
     return OFFLOAD_FAIL;
   }
+
+  fpga_info.program_fpga();
 
   return OFFLOAD_SUCCESS;
 }
