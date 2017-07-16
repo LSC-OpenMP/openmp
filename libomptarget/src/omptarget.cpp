@@ -40,11 +40,12 @@ enum StaticDeviceId {
 
 // List of all plugins that can support offloading.
 static const char *RTLNames[] = {
-    /* PowerPC target  */ "libomptarget.rtl.ppc64.so",
-    /* x86_64 target   */ "libomptarget.rtl.x86_64.so",
-    /* CUDA target     */ "libomptarget.rtl.cuda.so",
-    /* AArch64 target  */ "libomptarget.rtl.aarch64.so",
-    /* SmartNIC target */ "libomptarget.rtl.smartnic.so" };
+    /* PowerPC target    */ "libomptarget.rtl.ppc64.so",
+    /* x86_64 target     */ "libomptarget.rtl.x86_64.so",
+    /* CUDA target       */ "libomptarget.rtl.cuda.so",
+    /* AArch64 target    */ "libomptarget.rtl.aarch64.so",
+    /* SmartNIC target   */ "libomptarget.rtl.smartnic.so",
+    /* Intel HARP target */ "libomptarget.rtl.harp.so"};
 
 // forward declarations
 struct RTLInfoTy;
