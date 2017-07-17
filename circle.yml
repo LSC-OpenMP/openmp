@@ -35,7 +35,7 @@ test:
   pre:
     - mkdir $LIBHDFS3_SRC/build;
     - cd $LIBHDFS3_SRC/build && cmake $LIBHDFS3_SRC -DCMAKE_BUILD_TYPE=Release
-    - cd $LIBHDFS3_SRC/build && make install
+    - cd $LIBHDFS3_SRC/build && make
     - cd $LIBHDFS3_SRC/build && sudo make install
     - cp -R $CLANG_SRC $LLVM_SRC/tools/
     - cp -R $OPENMP_SRC $LLVM_SRC/projects/
