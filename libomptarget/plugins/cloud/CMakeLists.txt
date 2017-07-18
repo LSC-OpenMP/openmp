@@ -43,13 +43,22 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
         # Install plugin under the lib destination folder.
         install(TARGETS omptarget.rtl.cloud LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
 
-        target_link_libraries(omptarget.rtl.cloud
-          inih
-          ${LIBHDFS_LIBRARIES}
-          ${LIBELF_LIBRARIES}
-          ${LIBSSH_LIBRARIES}
-          ${ZLIB_LIBRARIES}
-          "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+        if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+           target_link_libraries(omptarget.rtl.cloud
+              inih
+              ${LIBOMPTARGET_DEP_LIBHDFS3_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
+              ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES})
+        else()
+           target_link_libraries(omptarget.rtl.cloud
+              inih
+              ${LIBOMPTARGET_DEP_LIBHDFS3_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
+              ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES}
+              "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+        endif()
 
       else()
         libomptarget_say("Not building cloud offloading plugin: libhdfs3 not found in system.")
