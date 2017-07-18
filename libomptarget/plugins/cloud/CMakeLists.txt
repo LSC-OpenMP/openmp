@@ -57,6 +57,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
               ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
               ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
               ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES}
+              dl
               "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
         endif()
 
