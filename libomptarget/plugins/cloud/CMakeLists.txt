@@ -14,7 +14,8 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
   if(LIBOMPTARGET_DEP_LIBSSH_FOUND)
     if(LIBOMPTARGET_DEP_ZLIB_FOUND)
       if(LIBOMPTARGET_DEP_LIBHDFS3_FOUND)
-        message("Building cloud offloading plugin")
+        
+        libomptarget_say("Building cloud offloading plugin")
 
         include_directories(src/)
         include_directories(src/providers)
