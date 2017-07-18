@@ -280,7 +280,7 @@ mark_as_advanced(
 # Looking for sbt...
 ################################################################################
 
-find_program(SBT_EXECUTABLE
+find_program(LIBOMPTARGET_DEP_SBT_EXECUTABLE
   NAMES
     sbt
   HINTS
@@ -293,10 +293,10 @@ find_program(SBT_EXECUTABLE
 )
 
 find_package_handle_standard_args(
-  SBT
+  LIBOMPTARGET_DEP_SBT
   DEFAULT_MSG
-  SBT_EXECUTABLE)
+  LIBOMPTARGET_DEP_SBT_EXECUTABLE)
 
 mark_as_advanced(
-  SBT_EXECUTABLE
+  LIBOMPTARGET_DEP_SBT_EXECUTABLE
 )
