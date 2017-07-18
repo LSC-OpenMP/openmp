@@ -39,6 +39,7 @@ The currently supported offloading device architectures are:
 * IBM(R) Power architecture (little endian) (generic 64-bit plugin - mostly for testing purposes)
 * ARM(R) AArch64 architecture (little endian) (generic 64-bit plugin - mostly for testing purposes)
 * CUDA(R) enabled 64-bit NVIDIA(R) GPU architectures
+* Apache Spark cluster
 
 Supported RTL Build Configurations
 ==================================

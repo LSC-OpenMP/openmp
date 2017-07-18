@@ -14,7 +14,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
   if(LIBOMPTARGET_DEP_LIBSSH_FOUND)
     if(LIBOMPTARGET_DEP_ZLIB_FOUND)
       if(LIBOMPTARGET_DEP_LIBHDFS3_FOUND)
-        
+
         libomptarget_say("Building cloud offloading plugin")
 
         include_directories(src/)
@@ -61,6 +61,10 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
               dl
               "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
         endif()
+
+        # Report to the parent scope that we are building a plugin.
+        set(LIBOMPTARGET_SYSTEM_TARGETS
+          "${LIBOMPTARGET_SYSTEM_TARGETS} x86_64-unkown-linux-spark" PARENT_SCOPE)
 
       else()
         libomptarget_say("Not building cloud offloading plugin: libhdfs3 not found in system.")
