@@ -79,7 +79,9 @@ find_path (
     /usr/local/include
     /opt/local/include
     /sw/include
-    ENV CPATH)
+    ENV CPATH
+  PATH_SUFFIXES
+    ffi)
 
 # Don't bother look for the library if the header files were not found.
 if (LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIR)
@@ -96,7 +98,9 @@ if (LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIR)
       /opt/local/lib
       /sw/lib
       ENV LIBRARY_PATH
-      ENV LD_LIBRARY_PATH)
+      ENV LD_LIBRARY_PATH
+    PATH_SUFFIXES
+      ffi)
 endif()
 
 set(LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIRS ${LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIR})
@@ -276,7 +280,7 @@ mark_as_advanced(
 # Looking for sbt...
 ################################################################################
 
-find_program(SBT_EXECUTABLE
+find_program(LIBOMPTARGET_DEP_SBT_EXECUTABLE
   NAMES
     sbt
   HINTS
@@ -289,10 +293,10 @@ find_program(SBT_EXECUTABLE
 )
 
 find_package_handle_standard_args(
-  SBT
+  LIBOMPTARGET_DEP_SBT
   DEFAULT_MSG
-  SBT_EXECUTABLE)
+  LIBOMPTARGET_DEP_SBT_EXECUTABLE)
 
 mark_as_advanced(
-  SBT_EXECUTABLE
+  LIBOMPTARGET_DEP_SBT_EXECUTABLE
 )

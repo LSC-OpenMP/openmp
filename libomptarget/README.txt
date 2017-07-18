@@ -26,25 +26,20 @@ For details about building, please look at Build_With_CMake.txt
 
 Architectures Supported
 =======================
-The current library has been only tested in Linux operating system and the 
-following host architectures: 
+The current library has been only tested in Linux operating system and the
+following host architectures:
 * Intel(R) 64 architecture
 * IBM(R) Power architecture (big endian)
 * IBM(R) Power architecture (little endian)
-<<<<<<< HEAD
-=======
 * ARM(R) AArch64 architecture (little endian)
->>>>>>> origin/master
 
 The currently supported offloading device architectures are:
 * Intel(R) 64 architecture (generic 64-bit plugin - mostly for testing purposes)
 * IBM(R) Power architecture (big endian) (generic 64-bit plugin - mostly for testing purposes)
 * IBM(R) Power architecture (little endian) (generic 64-bit plugin - mostly for testing purposes)
-<<<<<<< HEAD
-=======
 * ARM(R) AArch64 architecture (little endian) (generic 64-bit plugin - mostly for testing purposes)
->>>>>>> origin/master
 * CUDA(R) enabled 64-bit NVIDIA(R) GPU architectures
+* Apache Spark cluster
 
 Supported RTL Build Configurations
 ==================================
@@ -64,17 +59,16 @@ Front-end Compilers that work with this RTL
 ===========================================
 
 The following compilers are known to do compatible code generation for
-this RTL: 
+this RTL:
   - clang (from https://github.com/clang-ykt )
-  - clang (development branch at http://clang.llvm.org - several features still 
+  - clang (development branch at http://clang.llvm.org - several features still
     under development)
 
 -----------------------------------------------------------------------
 
 Notices
 =======
-This library and related compiler support is still under development, so the 
+This library and related compiler support is still under development, so the
 employed interface is likely to change in the future.
 
 *Other names and brands may be claimed as the property of others.
-

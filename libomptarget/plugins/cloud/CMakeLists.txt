@@ -14,7 +14,8 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
   if(LIBOMPTARGET_DEP_LIBSSH_FOUND)
     if(LIBOMPTARGET_DEP_ZLIB_FOUND)
       if(LIBOMPTARGET_DEP_LIBHDFS3_FOUND)
-        message("Building cloud offloading plugin")
+
+        libomptarget_say("Building cloud offloading plugin")
 
         include_directories(src/)
         include_directories(src/providers)
@@ -43,13 +44,27 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
         # Install plugin under the lib destination folder.
         install(TARGETS omptarget.rtl.cloud LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
 
-        target_link_libraries(omptarget.rtl.cloud
-          inih
-          ${LIBHDFS_LIBRARIES}
-          ${LIBELF_LIBRARIES}
-          ${LIBSSH_LIBRARIES}
-          ${ZLIB_LIBRARIES}
-          "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+        if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+           target_link_libraries(omptarget.rtl.cloud
+              inih
+              ${LIBOMPTARGET_DEP_LIBHDFS3_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
+              ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES})
+        else()
+           target_link_libraries(omptarget.rtl.cloud
+              inih
+              ${LIBOMPTARGET_DEP_LIBHDFS3_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
+              ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES}
+              dl
+              "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+        endif()
+
+        # Report to the parent scope that we are building a plugin.
+        set(LIBOMPTARGET_SYSTEM_TARGETS
+          "${LIBOMPTARGET_SYSTEM_TARGETS} x86_64-unkown-linux-spark" PARENT_SCOPE)
 
       else()
         libomptarget_say("Not building cloud offloading plugin: libhdfs3 not found in system.")

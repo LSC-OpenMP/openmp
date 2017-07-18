@@ -4,6 +4,8 @@ machine:
     LLVM_SRC: "$HOME/llvm"
     CLANG_SRC: "$HOME/clang"
     OPENMP_SRC: "$HOME/openmp"
+    LIBHDFS3_SRC: "$HOME/libhdfs3"
+    OMPCLOUD: "$HOME/ompcloud"
     PATH: "$HOME/cmake-3.7.2-Linux-x86_64/bin:$PATH"
 
 dependencies:
@@ -12,7 +14,14 @@ dependencies:
   pre:
     - git clone --depth 1 git://github.com/lsc-openmp/llvm.git $LLVM_SRC
     - git clone --depth 1 git://github.com/lsc-openmp/clang.git $CLANG_SRC
-    - sudo apt-get update; sudo apt-get install libelf-dev
+    - git clone git://github.com/ompcloud/ompcloud.git $OMPCLOUD
+    - git clone git://github.com/ompcloud/libhdfs3.git $LIBHDFS3_SRC
+    - sudo apt-get update
+    - sudo apt-get install -y libxml2-dev uuid-dev libprotobuf-dev protobuf-compiler libgsasl7-dev libkrb5-dev libssh-dev libelf-dev libffi-dev openjdk-8-jre-headless
+    - echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
+    - sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 642AC823
+    - sudo apt-get update
+    - sudo apt-get install -y sbt
   override:
     - >
       if [ ! -d $HOME/cmake-3.7.2-Linux-x86_64 ]; then
@@ -24,6 +33,10 @@ dependencies:
 
 test:
   pre:
+    - mkdir $LIBHDFS3_SRC/build
+    - cd $LIBHDFS3_SRC/build && cmake $LIBHDFS3_SRC -DCMAKE_BUILD_TYPE=Release
+    - cd $LIBHDFS3_SRC/build && make
+    - cd $LIBHDFS3_SRC/build && sudo make install
     - cp -R $CLANG_SRC $LLVM_SRC/tools/
     - cp -R $OPENMP_SRC $LLVM_SRC/projects/
   override:

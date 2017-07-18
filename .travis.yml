@@ -1,14 +1,27 @@
 language: cpp
 dist: trusty
+env:
+  global:
+    - LIBHDFS3_SRC=$TRAVIS_BUILD_DIR/libhdfs3
 sudo: required
 compiler:
-- clang
-- gcc
+  - clang
+  - gcc
 before_install:
-- sudo apt-get -qq update 
-- sudo apt-get install -y libelf-dev
+  - sudo apt-get -qq update
+  - sudo apt-get install -y libxml2-dev uuid-dev libprotobuf-dev protobuf-compiler libgsasl7-dev libkrb5-dev libssh-dev libelf-dev libffi-dev openjdk-8-jre-headless
+  - echo "deb https://dl.bintray.com/sbt/debian /" | sudo tee -a /etc/apt/sources.list.d/sbt.list
+  - sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 642AC823
+  - sudo apt-get update
+  - sudo apt-get install -y sbt
+  - git clone git://github.com/ompcloud/libhdfs3.git $LIBHDFS3_SRC
+  - mkdir $LIBHDFS3_SRC/build
+  - cd $LIBHDFS3_SRC/build
+  - cmake $LIBHDFS3_SRC -DCMAKE_BUILD_TYPE=Release
+  - make
+  - sudo make install
 script:
-- mkdir $TRAVIS_BUILD_DIR/build
-- cd $TRAVIS_BUILD_DIR/build
-- cmake $TRAVIS_BUILD_DIR
-- make
+  - mkdir $TRAVIS_BUILD_DIR/build
+  - cd $TRAVIS_BUILD_DIR/build
+  - cmake $TRAVIS_BUILD_DIR
+  - make
