@@ -1,4 +1,4 @@
-//===-RTLs/generic-64bit/src/rtl.cpp - Target RTLs Implementation - C++ -*-===//
+//===----RTLs/smartnic/src/rtl.cpp - Target RTLs Implementation --- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,29 +7,29 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RTL for generic 64-bit machine
+// RTL for SMARTNIC machine
 //
 //===----------------------------------------------------------------------===//
 
 #include <cassert>
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
-#include <dlfcn.h>
+#include <cstddef>
+#include <list>
+#include <string>
+#include <vector>
 #include <ffi.h>
 #include <gelf.h>
 #include <link.h>
-#include <list>
-#include <vector>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <arpa/inet.h>
 
 #include "omptarget.h"
 
 #ifndef TARGET_NAME
-#define TARGET_NAME Generic ELF - 64bit
-#endif
-
-#ifndef TARGET_ELF_ID
-#define TARGET_ELF_ID 0
+#define TARGET_NAME SMARTNIC
 #endif
 
 #define GETNAME2(name) #name
@@ -38,8 +38,21 @@
 
 #include "../../common/elf_common.c"
 
-#define NUMBER_OF_DEVICES 4
+#define NUMBER_OF_DEVICES 1
 #define OFFLOADSECTIONNAME ".omp_offloading.entries"
+
+// Utility for retrieving and printing SMARTNIC error string.
+#ifdef SMARTNIC_ERROR_REPORT
+#define SMARTNIC_ERR_STRING(err)                                               \
+  do {                                                                         \
+    const char *errStr;                                                        \
+    cuGetErrorString(err, &errStr);                                            \
+    DP("SMARTNIC error is: %s\n", errStr);                                     \
+  } while (0)
+#else
+#define SMARTNIC_ERR_STRING(err)                                               \
+  {}
+#endif
 
 /// Array of Dynamic libraries loaded for this target.
 struct DynLibTy {
@@ -52,11 +65,223 @@ struct FuncOrGblEntryTy {
   __tgt_target_table Table;
 };
 
+/// Class to handle socket.
+class SocketHandle {
+ private:
+  int sockfd;
+  int portno;
+  int conn_status;
+  struct sockaddr_in serv_addr;
+  struct hostent *server;
+
+  inline void send_ack() {
+    if (send(this->sockfd, "ack", 3, 0) < 0) {
+      DP("[smartnic] error writing ack to socket\n");
+      throw -1;
+    }
+  }
+
+  inline void get_ack() {
+    char buffer[3];
+
+    bzero(buffer, 3);
+    if (recv(this->sockfd, buffer, 3, 0) < 0) {
+      DP("[smartnic] error reading ack from socket\n");
+      throw -1;
+    }
+
+    if (buffer[0] != 'a' || buffer[1] != 'c' || buffer[2] != 'k') {
+      DP("[smartnic] error not received ack message\n");
+      throw -1;
+    }
+
+    DP("[smartnic] ack received!\n");
+  }
+
+  inline void send_cmd(char cmd) {
+    char buffer[1];
+
+    buffer[0] = cmd;
+
+    if (send(this->sockfd, buffer, 1, 0) < 0) {
+      DP("[smartnic] error cmd from socket!\n");
+      throw -1;
+    }
+
+    this->get_ack();
+  }
+
+  inline void send_data(void *data, int64_t size) {
+    if (send(this->sockfd, data, size, 0) < 0) {
+      DP("[smartnic] send data error!\n");
+      throw -1;
+    }
+
+    this->get_ack();
+  }
+
+  inline void recv_data(void *data, int64_t size) {
+    ssize_t recv_bytes = 0;
+
+    do {
+      recv_bytes += recv(this->sockfd, data + recv_bytes, size, 0);
+
+      if (recv_bytes < 0) {
+        DP("[smartnic] recv data error!\n");
+        throw -1;
+      }
+    } while(recv_bytes != size);
+
+    this->send_ack();
+  }
+
+ public:
+  int conn() {
+    this->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    if (sockfd < 0) {
+      DP("[smartnic] error - opening the socket!");
+      return -1;
+    }
+
+    bzero((char *) &this->serv_addr, sizeof(serv_addr));
+
+    inet_pton(AF_INET, "127.0.0.1", &(this->serv_addr.sin_addr));
+    this->serv_addr.sin_family = AF_INET;
+    this->serv_addr.sin_port = htons(this->portno);
+
+    conn_status = connect(this->sockfd,
+                          (struct sockaddr *) &this->serv_addr,
+                          sizeof(this->serv_addr));
+
+    return conn_status;
+  }
+
+  int write(void *data, int64_t size) {
+    int write_status = 1;
+
+    assert(size > 0);
+
+    try {
+      this->send_cmd('w');
+      this->send_data(reinterpret_cast<void*>(&size), 8);
+      this->send_data(data, size);
+    } catch (int e) {
+      write_status = e;
+    }
+
+    return write_status;
+  }
+
+  int program(void *data, int64_t size) {
+    int program_status = 1;
+
+    assert(size > 0);
+
+    try {
+      this->send_cmd('p');
+      this->send_data(data, size);
+    } catch (int e) {
+      program_status = e;
+    }
+
+    return program_status;
+  }
+
+  int read(void *data, int64_t size) {
+    int read_status = 1;
+
+    assert(size > 0);
+
+    try {
+      this->send_cmd('r');
+      this->send_data(reinterpret_cast<void*>(&size), 8);
+      this->recv_data(data, size);
+    } catch (int e) {
+      read_status = e;
+    }
+
+    return read_status;
+  }
+
+  void disconnect() {
+    this->send_cmd('q');
+    this->send_ack();
+
+    close(this->sockfd);
+  }
+
+  int get_conn_status() {
+    return conn_status;
+  }
+
+  SocketHandle() {
+    this->portno = 51717;
+    this->conn_status = -1;
+
+    this->conn();
+  }
+
+  SocketHandle(int portno) {
+    this->portno = portno;
+    this->conn_status = -1;
+  }
+
+  ~SocketHandle() {
+    DP("[smartnic] socket closed\n");
+    this->send_cmd('q');
+    this->send_ack();
+
+    close(this->sockfd);
+  }
+};
+
+/// Class containing FPGA information
+class FPGAInfo {
+private:
+  SocketHandle *socket_handle;
+  char *last_module;
+  char *module;
+
+public:
+
+  void set_module(char *module) {
+    this->module = (char*) realloc(last_module, sizeof(module));
+    memcpy(this->module, module, strlen(module));
+  }
+
+  void program_fpga() {
+    if (strlen(module) == 0)
+      return;
+
+    if (last_module == NULL || strcmp(module, last_module) != 0) {
+      last_module = (char*) realloc(last_module, sizeof(module));
+
+      memcpy(last_module, module, strlen(module));
+
+      this->socket_handle->program(reinterpret_cast<void*>(module),
+                                   strlen(module) + 1);
+
+      DP("[fpga_info] programming FPGA - %s\n", last_module);
+    }
+  }
+
+  FPGAInfo(SocketHandle *socket_handle) {
+    this->last_module = NULL;
+    this->socket_handle = socket_handle;
+  }
+
+  ~FPGAInfo() {
+    free(this->last_module);
+  }
+};
+
 /// Class containing all the device information.
 class RTLDeviceInfoTy {
   std::vector<FuncOrGblEntryTy> FuncGblEntries;
 
 public:
+
   std::list<DynLibTy> DynLibs;
 
   // Record entry point associated with device.
@@ -108,23 +333,60 @@ public:
 };
 
 static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
+static SocketHandle    socket_handle;
+static FPGAInfo        fpga_info(&socket_handle);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
-// If we don't have a valid ELF ID we can just fail.
-#if TARGET_ELF_ID < 1
-  return 0;
-#else
-  return elf_check_machine(image, TARGET_ELF_ID, 0);
-#endif
+  uint32_t is_valid_binary = elf_check_machine(image, EM_X86_64, 9001);
+
+  // TODO(ciroc): extract struct information
+  if (is_valid_binary) {
+    __tgt_configuration *cfg;
+    int i;
+    char *module = NULL;
+    char *img_begin = (char *)image->ImageStart;
+
+    get_tgt_configuration_module(image, &cfg);
+
+    // string constant pointer to .rodata section of elf (img_begin)
+    for(i = 0; *(img_begin + (intptr_t)cfg->module + i) != '\0'; i++) {
+      module = (char*) realloc(module, (i + 1));
+      module[i] = *(img_begin + (intptr_t)cfg->module + i);
+    }
+    module = (char*) realloc(module, (i + 1));
+    module[i] = '\0';
+
+    fpga_info.set_module(module);
+
+    DP("[smartnic] sub_target_id = %d\n", cfg->sub_target_id);
+    DP("[smartnic] module = %s\n", module);
+
+    free(module);
+  }
+
+  return is_valid_binary;
 }
 
-int32_t __tgt_rtl_number_of_devices() { return NUMBER_OF_DEVICES; }
+int32_t __tgt_rtl_number_of_devices() {
+  return NUMBER_OF_DEVICES;
+}
 
-int32_t __tgt_rtl_init_device(int32_t device_id) { return OFFLOAD_SUCCESS; }
+int32_t __tgt_rtl_init_device(int32_t device_id) {
+
+  DP("[smartnic] __tgt_rtl_init_device\n");
+
+  if (socket_handle.get_conn_status() < 0) {
+    return OFFLOAD_FAIL;
+  }
+
+  fpga_info.program_fpga();
+
+  return OFFLOAD_SUCCESS;
+}
 
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
                                           __tgt_device_image *image) {
@@ -252,58 +514,55 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size) {
+  DP("[smartnic] __tgt_rtl_data_alloc\n");
   void *ptr = malloc(size);
+
   return ptr;
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
-                              int64_t size) {
-  memcpy(tgt_ptr, hst_ptr, size);
+    int64_t size) {
+
+  DP("[smartnic] __tgt_rtl_data_submit: %d\n", size);
+
+  socket_handle.write(hst_ptr, size);
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
-                                int64_t size) {
-  memcpy(hst_ptr, tgt_ptr, size);
+    int64_t size) {
+
+  DP("[smartnic] __tgt_rtl_data_retrieve\n");
+
+  socket_handle.read(hst_ptr, size);
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
+
+  DP("[smartnic] __tgt_rtl_delete\n");
+
   free(tgt_ptr);
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit,
-    uint64_t loop_tripcount /*not used*/) {
-  // ignore team num and thread limit.
+    uint64_t loop_tripcount) {
 
-  // Use libffi to launch execution.
-  ffi_cif cif;
+  DP("[smartnic] __tgt_rtl_run_target_team_region\n");
 
-  // All args are references.
-  std::vector<ffi_type *> args_types(arg_num, &ffi_type_pointer);
-  std::vector<void *> args(arg_num);
-
-  for (int32_t i = 0; i < arg_num; ++i)
-    args[i] = &tgt_args[i];
-
-  ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_num,
-                                   &ffi_type_void, &args_types[0]);
-
-  assert(status == FFI_OK && "Unable to prepare target launch!");
-
-  if (status != FFI_OK)
-    return OFFLOAD_FAIL;
-
-  DP("Running entry point at " DPxMOD "...\n", DPxPTR(tgt_entry_ptr));
-
-  ffi_call(&cif, FFI_FN(tgt_entry_ptr), NULL, &args[0]);
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
-                                    void **tgt_args, int32_t arg_num) {
+    void **tgt_args, int32_t arg_num) {
+
+  DP("[smartnic] __tgt_rtl_run_target_region\n");
+
   // use one team and one thread.
   return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
                                           arg_num, 1, 1, 0);

@@ -17,7 +17,6 @@
 #include <climits>
 #include <cstdlib>
 #include <cstring>
-#include <dlfcn.h>
 #include <list>
 #include <map>
 #include <mutex>
@@ -31,12 +30,22 @@
 #define INF_REF_CNT (LONG_MAX>>1) // leave room for additions/subtractions
 #define CONSIDERED_INF(x) (x > (INF_REF_CNT>>1))
 
+// user could choose always the same device even if the number
+// of devices change.
+enum StaticDeviceId {
+  SMARTNIC = 9001,
+  HARP2    = 9002,
+  CLOUD    = 9003
+};
+
 // List of all plugins that can support offloading.
 static const char *RTLNames[] = {
-    /* PowerPC target */ "libomptarget.rtl.ppc64.so",
-    /* x86_64 target  */ "libomptarget.rtl.x86_64.so",
-    /* CUDA target    */ "libomptarget.rtl.cuda.so",
-    /* AArch64 target */ "libomptarget.rtl.aarch64.so"};
+    /* PowerPC target    */ "libomptarget.rtl.ppc64.so",
+    /* x86_64 target     */ "libomptarget.rtl.x86_64.so",
+    /* CUDA target       */ "libomptarget.rtl.cuda.so",
+    /* AArch64 target    */ "libomptarget.rtl.aarch64.so",
+    /* SmartNIC target   */ "libomptarget.rtl.smartnic.so",
+    /* Intel HARP target */ "libomptarget.rtl.harp.so"};
 
 // forward declarations
 struct RTLInfoTy;
@@ -194,6 +203,8 @@ struct RTLInfoTy {
 
   void *LibraryHandler;
 
+  int staticDeviceId;
+
 #ifdef OMPTARGET_DEBUG
   std::string RTLName;
 #endif
@@ -222,6 +233,7 @@ struct RTLInfoTy {
   // We need to provide a copy constructor explicitly.
   RTLInfoTy()
       : Idx(-1), NumberOfDevices(-1), Devices(), LibraryHandler(0),
+        staticDeviceId(-1),
 #ifdef OMPTARGET_DEBUG
         RTLName(),
 #endif
@@ -235,6 +247,7 @@ struct RTLInfoTy {
     NumberOfDevices = r.NumberOfDevices;
     Devices = r.Devices;
     LibraryHandler = r.LibraryHandler;
+    staticDeviceId = r.staticDeviceId;
 #ifdef OMPTARGET_DEBUG
     RTLName = r.RTLName;
 #endif
@@ -304,6 +317,13 @@ void RTLsTy::LoadRTLs() {
     R.LibraryHandler = dynlib_handle;
     R.isUsed = false;
 
+    if (strcmp(Name, "libomptarget.rtl.smartnic.so") == 0) {
+      R.staticDeviceId = SMARTNIC;
+      printf("smartnic device id | id = %d\n", R.staticDeviceId);
+    } else if (strcmp(Name, "libomptarget.rtl.harp.so") == 0) {
+      R.staticDeviceId = HARP2;
+    }
+
 #ifdef OMPTARGET_DEBUG
     R.RTLName = Name;
 #endif
@@ -355,6 +375,17 @@ void RTLsTy::LoadRTLs() {
   DP("RTLs loaded!\n");
 
   return;
+}
+
+/// catch static device id.
+inline int translate_device_id(int device) {
+  for (int i = 0; (device > 9000) & (i < Devices.size()); i++) {
+    if (Devices[i].RTL->staticDeviceId == device) {
+      return i;
+    }
+  }
+
+  return device;
 }
 
 void RTLsTy::LoadRTLsOnce() {
@@ -445,6 +476,8 @@ EXTERN int omp_get_initial_device(void) {
 }
 
 EXTERN void *omp_target_alloc(size_t size, int device_num) {
+  device_num = translate_device_id(device_num);
+
   DP("Call to omp_target_alloc for device %d requesting %zu bytes\n",
       device_num, size);
 
@@ -473,6 +506,8 @@ EXTERN void *omp_target_alloc(size_t size, int device_num) {
 }
 
 EXTERN void omp_target_free(void *device_ptr, int device_num) {
+  device_num = translate_device_id(device_num);
+
   DP("Call to omp_target_free for device %d and address " DPxMOD "\n",
       device_num, DPxPTR(device_ptr));
 
@@ -498,6 +533,8 @@ EXTERN void omp_target_free(void *device_ptr, int device_num) {
 }
 
 EXTERN int omp_target_is_present(void *ptr, int device_num) {
+  device_num = translate_device_id(device_num);
+
   DP("Call to omp_target_is_present for device %d and address " DPxMOD "\n",
       device_num, DPxPTR(ptr));
 
@@ -639,6 +676,8 @@ EXTERN int omp_target_memcpy_rect(void *dst, void *src, size_t element_size,
 
 EXTERN int omp_target_associate_ptr(void *host_ptr, void *device_ptr,
     size_t size, size_t device_offset, int device_num) {
+  device_num = translate_device_id(device_num);
+
   DP("Call to omp_target_associate_ptr with host_ptr " DPxMOD ", "
       "device_ptr " DPxMOD ", size %zu, device_offset %zu, device_num %d\n",
       DPxPTR(host_ptr), DPxPTR(device_ptr), size, device_offset, device_num);
@@ -666,6 +705,8 @@ EXTERN int omp_target_associate_ptr(void *host_ptr, void *device_ptr,
 }
 
 EXTERN int omp_target_disassociate_ptr(void *host_ptr, int device_num) {
+  device_num = translate_device_id(device_num);
+
   DP("Call to omp_target_disassociate_ptr with host_ptr " DPxMOD ", "
       "device_num %d\n", DPxPTR(host_ptr), device_num);
 
@@ -1727,6 +1768,8 @@ EXTERN void __tgt_target_data_begin_nowait(int32_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types,
     int32_t depNum, void *depList, int32_t noAliasDepNum,
     void *noAliasDepList) {
+  device_id = translate_device_id(device_id);
+
   if (depNum + noAliasDepNum > 0)
     __kmpc_omp_taskwait(NULL, 0);
 
@@ -1739,6 +1782,8 @@ EXTERN void __tgt_target_data_begin_nowait(int32_t device_id, int32_t arg_num,
 /// and passes the data to the device.
 EXTERN void __tgt_target_data_begin(int32_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+  device_id = translate_device_id(device_id);
+
   DP("Entering data begin region for device %d with %d mappings\n", device_id,
      arg_num);
 
@@ -1884,6 +1929,8 @@ static int target_data_end(DeviceTy &Device, int32_t arg_num, void **args_base,
 /// created by the last __tgt_target_data_begin.
 EXTERN void __tgt_target_data_end(int32_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+  device_id = translate_device_id(device_id);
+
   DP("Entering data end region with %d mappings\n", arg_num);
 
   // No devices available?
@@ -1927,6 +1974,8 @@ EXTERN void __tgt_target_data_end_nowait(int32_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types,
     int32_t depNum, void *depList, int32_t noAliasDepNum,
     void *noAliasDepList) {
+  device_id = translate_device_id(device_id);
+
   if (depNum + noAliasDepNum > 0)
     __kmpc_omp_taskwait(NULL, 0);
 
@@ -1937,6 +1986,8 @@ EXTERN void __tgt_target_data_end_nowait(int32_t device_id, int32_t arg_num,
 /// passes data to/from the target.
 EXTERN void __tgt_target_data_update(int32_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+  device_id = translate_device_id(device_id);
+
   DP("Entering data update with %d mappings\n", arg_num);
 
   // No devices available?
@@ -2016,6 +2067,8 @@ EXTERN void __tgt_target_data_update_nowait(
     int32_t device_id, int32_t arg_num, void **args_base, void **args,
     int64_t *arg_sizes, int32_t *arg_types, int32_t depNum, void *depList,
     int32_t noAliasDepNum, void *noAliasDepList) {
+  device_id = translate_device_id(device_id);
+
   if (depNum + noAliasDepNum > 0)
     __kmpc_omp_taskwait(NULL, 0);
 
@@ -2208,6 +2261,8 @@ static int target(int32_t device_id, void *host_ptr, int32_t arg_num,
 
 EXTERN int __tgt_target(int32_t device_id, void *host_ptr, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+  device_id = translate_device_id(device_id);
+
   if (device_id == OFFLOAD_DEVICE_CONSTRUCTOR ||
       device_id == OFFLOAD_DEVICE_DESTRUCTOR) {
     // Return immediately for the time being, target calls with device_id
@@ -2252,6 +2307,8 @@ EXTERN int __tgt_target_nowait(int32_t device_id, void *host_ptr,
     int32_t arg_num, void **args_base, void **args, int64_t *arg_sizes,
     int32_t *arg_types, int32_t depNum, void *depList, int32_t noAliasDepNum,
     void *noAliasDepList) {
+  device_id = translate_device_id(device_id);
+
   if (depNum + noAliasDepNum > 0)
     __kmpc_omp_taskwait(NULL, 0);
 
@@ -2262,6 +2319,8 @@ EXTERN int __tgt_target_nowait(int32_t device_id, void *host_ptr,
 EXTERN int __tgt_target_teams(int32_t device_id, void *host_ptr,
     int32_t arg_num, void **args_base, void **args, int64_t *arg_sizes,
     int32_t *arg_types, int32_t team_num, int32_t thread_limit) {
+  device_id = translate_device_id(device_id);
+
   if (device_id == OFFLOAD_DEVICE_CONSTRUCTOR ||
       device_id == OFFLOAD_DEVICE_DESTRUCTOR) {
     // Return immediately for the time being, target calls with device_id
@@ -2307,6 +2366,8 @@ EXTERN int __tgt_target_teams_nowait(int32_t device_id, void *host_ptr,
     int32_t arg_num, void **args_base, void **args, int64_t *arg_sizes,
     int32_t *arg_types, int32_t team_num, int32_t thread_limit, int32_t depNum,
     void *depList, int32_t noAliasDepNum, void *noAliasDepList) {
+  device_id = translate_device_id(device_id);
+
   if (depNum + noAliasDepNum > 0)
     __kmpc_omp_taskwait(NULL, 0);
 
@@ -2318,6 +2379,7 @@ EXTERN int __tgt_target_teams_nowait(int32_t device_id, void *host_ptr,
 // The trip count mechanism will be revised - this scheme is not thread-safe.
 EXTERN void __kmpc_push_target_tripcount(int32_t device_id,
     uint64_t loop_tripcount) {
+  device_id = translate_device_id(device_id);
   if (device_id == OFFLOAD_DEVICE_DEFAULT) {
     device_id = omp_get_default_device();
   }
