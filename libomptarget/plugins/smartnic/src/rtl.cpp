@@ -352,7 +352,8 @@ int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
     char *module = NULL;
     char *img_begin = (char *)image->ImageStart;
 
-    get_tgt_configuration_module(image, &cfg);
+    if (0 != get_tgt_configuration_module(image, &cfg))
+      return is_valid_binary;
 
     // string constant pointer to .rodata section of elf (img_begin)
     for(i = 0; *(img_begin + (intptr_t)cfg->module + i) != '\0'; i++) {
