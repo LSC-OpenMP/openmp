@@ -124,7 +124,7 @@ class SocketHandle {
     ssize_t recv_bytes = 0;
 
     do {
-      recv_bytes += recv(this->sockfd, data + recv_bytes, size, 0);
+      recv_bytes += recv(this->sockfd, static_cast<char*>(data) + recv_bytes, size, 0);
 
       if (recv_bytes < 0) {
         DP("[smartnic] recv data error!\n");
