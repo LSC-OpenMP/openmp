@@ -119,6 +119,8 @@ static inline int32_t check_devices(Elf *e,
 }
 
 // Check whether an image is valid for execution on target_id
+
+// Check whether an image is valid for execution on target_id and sub_target_id
 static inline int32_t elf_check_machine(__tgt_device_image *image,
                                         uint16_t target_id,
                                         uint16_t sub_target_id) {
@@ -176,7 +178,7 @@ static inline int32_t elf_check_machine(__tgt_device_image *image,
 static inline int32_t get_tgt_configuration_module(__tgt_device_image *image,
                                                    __tgt_configuration **cfg) {
 
-  int is_success = 1;
+  int has_failed = 0;
   Elf_Scn* section = 0;
   GElf_Shdr shdr;
 
@@ -188,14 +190,64 @@ static inline int32_t get_tgt_configuration_module(__tgt_device_image *image,
   Elf *e = elf_memory(img_begin, img_size);
 
   if (!find_section_by_name(e, &section, ".omp_offloading.configuration"))
-    is_success = 1;
-  if (!is_success || !find_section_shdr(section, shdr))
-    is_success = 2;
-  if (!is_success || !map_tgt_configuration(section, shdr, img_begin, cfg))
-    is_success = 3;
+    has_failed = 1;
+  if (has_failed || !find_section_shdr(section, shdr))
+    has_failed = 2;
+  if (has_failed || !map_tgt_configuration(section, shdr, img_begin, cfg))
+    has_failed = 3;
 
   elf_end(e);
 
-  return is_success;
+  return has_failed;
+}
+
+// Check whether an image is valid for execution on target_id
+static inline int32_t elf_check_machine(__tgt_device_image *image,
+                                        uint16_t target_id) {
+
+  // Is the library version incompatible with the header file?
+  if (elf_version(EV_CURRENT) == EV_NONE) {
+    DP("Incompatible ELF library!\n");
+    return 0;
+  }
+
+  char *img_begin = (char *)image->ImageStart;
+  char *img_end = (char *)image->ImageEnd;
+  size_t img_size = img_end - img_begin;
+
+  // Obtain elf handler
+  Elf *e = elf_memory(img_begin, img_size);
+  if (!e) {
+    DP("Unable to get ELF handle: %s!\n", elf_errmsg(-1));
+    return 0;
+  }
+
+  // Check if ELF is the right kind.
+  if (elf_kind(e) != ELF_K_ELF) {
+    DP("Unexpected ELF type!\n");
+    return 0;
+  }
+  Elf64_Ehdr *eh64 = elf64_getehdr(e);
+  Elf32_Ehdr *eh32 = elf32_getehdr(e);
+
+  if (!eh64 && !eh32) {
+    DP("Unable to get machine ID from ELF file!\n");
+    elf_end(e);
+    return 0;
+  }
+
+  uint16_t MachineID;
+  if (eh64 && !eh32)
+    MachineID = eh64->e_machine;
+  else if (eh32 && !eh64)
+    MachineID = eh32->e_machine;
+  else {
+    DP("Ambiguous ELF header!\n");
+    elf_end(e);
+    return 0;
+  }
+
+  elf_end(e);
+  return MachineID == target_id;
 }
 
