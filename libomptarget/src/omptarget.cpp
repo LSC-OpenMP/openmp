@@ -1591,7 +1591,7 @@ EXTERN void __tgt_target_data_begin_nowait(int64_t device_id, int32_t arg_num,
 /// creates host-to-target data mapping, stores it in the
 /// libomptarget.so internal structure (an entry in a stack of data maps)
 /// and passes the data to the device.
-EXTERN void __tgt_target_data_begin(int32_t device_id, int32_t arg_num,
+EXTERN void __tgt_target_data_begin(int64_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
   device_id = translate_device_id(device_id);
 
@@ -1749,7 +1749,7 @@ static int target_data_end(DeviceTy &Device, int32_t arg_num, void **args_base,
 /// passes data from the target, releases target memory and destroys
 /// the host-target mapping (top entry from the stack of data maps)
 /// created by the last __tgt_target_data_begin.
-EXTERN void __tgt_target_data_end(int32_t device_id, int32_t arg_num,
+EXTERN void __tgt_target_data_end(int64_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
   device_id = translate_device_id(device_id);
 
@@ -2088,7 +2088,7 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
   return rc;
 }
 
-EXTERN int __tgt_target(int32_t device_id, void *host_ptr, int32_t arg_num,
+EXTERN int __tgt_target(int64_t device_id, void *host_ptr, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
   device_id = translate_device_id(device_id);
 
