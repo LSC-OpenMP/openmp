@@ -1592,7 +1592,7 @@ EXTERN void __tgt_target_data_begin_nowait(int64_t device_id, int32_t arg_num,
 /// libomptarget.so internal structure (an entry in a stack of data maps)
 /// and passes the data to the device.
 EXTERN void __tgt_target_data_begin(int64_t device_id, int32_t arg_num,
-    void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+    void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types) {
   device_id = translate_device_id(device_id);
 
   DP("Entering data begin region for device %d with %d mappings\n", device_id,
@@ -1750,7 +1750,7 @@ static int target_data_end(DeviceTy &Device, int32_t arg_num, void **args_base,
 /// the host-target mapping (top entry from the stack of data maps)
 /// created by the last __tgt_target_data_begin.
 EXTERN void __tgt_target_data_end(int64_t device_id, int32_t arg_num,
-    void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+    void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types) {
   device_id = translate_device_id(device_id);
 
   DP("Entering data end region with %d mappings\n", arg_num);
@@ -1799,8 +1799,8 @@ EXTERN void __tgt_target_data_end_nowait(int64_t device_id, int32_t arg_num,
 }
 
 /// passes data to/from the target.
-EXTERN void __tgt_target_data_update(int32_t device_id, int32_t arg_num,
-    void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+EXTERN void __tgt_target_data_update(int64_t device_id, int32_t arg_num,
+    void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types) {
   device_id = translate_device_id(device_id);
 
   DP("Entering data update for device %" PRId64 " with %d mappings\n",
@@ -2089,7 +2089,7 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
 }
 
 EXTERN int __tgt_target(int64_t device_id, void *host_ptr, int32_t arg_num,
-    void **args_base, void **args, int64_t *arg_sizes, int32_t *arg_types) {
+    void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types) {
   device_id = translate_device_id(device_id);
 
   DP("Entering target region with entry point " DPxMOD " and device Id %" PRId64
@@ -2133,7 +2133,7 @@ EXTERN int __tgt_target_nowait(int64_t device_id, void *host_ptr,
 
 EXTERN int __tgt_target_teams(int64_t device_id, void *host_ptr,
     int32_t arg_num, void **args_base, void **args, int64_t *arg_sizes,
-    int32_t *arg_types, int32_t team_num, int32_t thread_limit) {
+    int64_t *arg_types, int32_t team_num, int32_t thread_limit) {
   device_id = translate_device_id(device_id);
 
   DP("Entering target region with entry point " DPxMOD " and device Id %" PRId64
