@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-#include "omptarget.h"
+#include "omptargetplugin.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME CUDA
@@ -44,6 +44,11 @@
   {}
 #endif
 
+// Set CUDA's printf buffer size to 2^x times than its default
+#ifndef TARGET_PRINTF_BUFFER_SIZE_FACTOR
+#define TARGET_PRINTF_BUFFER_SIZE_FACTOR 4
+#endif
+
 /// Keep entries table per device.
 struct FuncOrGblEntryTy {
   __tgt_target_table Table;
@@ -51,8 +56,9 @@ struct FuncOrGblEntryTy {
 };
 
 enum ExecutionModeType {
-  SPMD,
-  GENERIC,
+  SPMD, // constructors, destructors,
+        // combined constructs (`teams distribute parallel for [simd]`)
+  GENERIC, // everything else
   NONE
 };
 
@@ -65,8 +71,12 @@ struct KernelTy {
   // 1 - Generic mode (with master warp)
   int8_t ExecutionMode;
 
-  KernelTy(CUfunction _Func, int8_t _ExecutionMode)
-      : Func(_Func), ExecutionMode(_ExecutionMode) {}
+  // Temporary - to be removed
+  int8_t HasTeamsReduction;
+
+  KernelTy(CUfunction _Func, int8_t _ExecutionMode, int8_t _HasTeamsReduction)
+      : Func(_Func), ExecutionMode(_ExecutionMode),
+        HasTeamsReduction(_HasTeamsReduction) {}
 };
 
 /// List that contains all the kernels.
@@ -339,6 +349,15 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
         DeviceInfo.ThreadsPerBlock[device_id]);
   }
 
+#ifdef OMPTARGET_DEBUG
+  size_t printf_buffer_sz;
+  cudaDeviceGetLimit(&printf_buffer_sz, cudaLimitPrintfFifoSize);
+  DP("printf buffer limit %zu\n", printf_buffer_sz);
+  printf_buffer_sz <<= TARGET_PRINTF_BUFFER_SIZE_FACTOR;
+  cudaDeviceSetLimit(cudaLimitPrintfFifoSize, printf_buffer_sz);
+  DP("Setting new printf buffer limit to %zu\n", printf_buffer_sz);
+#endif
+
   return OFFLOAD_SUCCESS;
 }
 
@@ -462,7 +481,50 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
       CUDA_ERR_STRING(err);
     }
 
-    KernelsList.push_back(KernelTy(fun, ExecModeVal));
+    /*
+     * Temporary fix for kernels with teams reduction
+     */
+    // default value 1 (in case symbol is missing from cubin file)
+    int8_t ReductionVal = 1;
+    std::string ReductionNameStr (e->name);
+    ReductionNameStr += "_reduction";
+    const char *ReductionName = ReductionNameStr.c_str();
+
+    CUdeviceptr ReductionPtr;
+    err = cuModuleGetGlobal(&ReductionPtr, &cusize, cumod, ReductionName);
+    if (err == CUDA_SUCCESS) {
+      if ((size_t)cusize != sizeof(int8_t)) {
+        DP("Loading global reduction '%s' - size mismatch (%zd != %zd)\n",
+           ReductionName, cusize, sizeof(int8_t));
+        CUDA_ERR_STRING(err);
+        return NULL;
+      }
+
+      err = cuMemcpyDtoH(&ReductionVal, ReductionPtr, cusize);
+      if (err != CUDA_SUCCESS) {
+        DP("Error when copying data from device to host. Pointers: "
+           "host = " DPxMOD ", device = " DPxMOD ", size = %zd\n",
+           DPxPTR(&ReductionVal), DPxPTR(ReductionPtr), cusize);
+        CUDA_ERR_STRING(err);
+        return NULL;
+      }
+
+      if (ReductionVal < 0 || ReductionVal > 1) {
+        DP("Error wrong reduction value specified in cubin file: %d\n",
+           ExecModeVal);
+        return NULL;
+      }
+    } else {
+      DP("Loading global reduction '%s' - symbol missing, using default value "
+          "GENERIC (1)\n", ReductionName);
+      CUDA_ERR_STRING(err);
+    }
+    /*
+     * End temporary fix for kernels with teams reduction
+     */
+
+    //KernelsList.push_back(KernelTy(fun, ExecModeVal));
+    KernelsList.push_back(KernelTy(fun, ExecModeVal, ReductionVal));
 
     __tgt_offload_entry entry = *e;
     entry.addr = (void *)&KernelsList.back();
@@ -472,7 +534,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
-void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size) {
+void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr) {
   if (size == 0) {
     return NULL;
   }
@@ -558,8 +620,8 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
-    void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit,
-    uint64_t loop_tripcount) {
+    void **tgt_args, ptrdiff_t *tgt_offsets, int32_t arg_num, int32_t team_num,
+    int32_t thread_limit, uint64_t loop_tripcount) {
   // Set the context we are using.
   CUresult err = cuCtxSetCurrent(DeviceInfo.Contexts[device_id]);
   if (err != CUDA_SUCCESS) {
@@ -570,9 +632,12 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   // All args are references.
   std::vector<void *> args(arg_num);
+  std::vector<void *> ptrs(arg_num);
 
-  for (int32_t i = 0; i < arg_num; ++i)
-    args[i] = &tgt_args[i];
+  for (int32_t i = 0; i < arg_num; ++i) {
+    ptrs[i] = (void *)((intptr_t)tgt_args[i] + tgt_offsets[i]);
+    args[i] = &ptrs[i];
+  }
 
   KernelTy *KernelInfo = (KernelTy *)tgt_entry_ptr;
 
@@ -581,6 +646,11 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   if (thread_limit > 0) {
     cudaThreadsPerBlock = thread_limit;
     DP("Setting CUDA threads per block to requested %d\n", thread_limit);
+    // Add master warp if necessary
+    if (KernelInfo->ExecutionMode == GENERIC) {
+      cudaThreadsPerBlock += DeviceInfo.WarpSize[device_id];
+      DP("Adding master warp: +%d threads\n", DeviceInfo.WarpSize[device_id]);
+    }
   } else {
     cudaThreadsPerBlock = DeviceInfo.NumThreads[device_id];
     if (KernelInfo->ExecutionMode == GENERIC) {
@@ -589,12 +659,6 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     }
     DP("Setting CUDA threads per block to default %d\n",
         DeviceInfo.NumThreads[device_id]);
-  }
-
-  // Add master warp if necessary
-  if (KernelInfo->ExecutionMode == GENERIC) {
-    cudaThreadsPerBlock += DeviceInfo.WarpSize[device_id];
-    DP("Adding master warp: +%d threads\n", DeviceInfo.WarpSize[device_id]);
   }
 
   if (cudaThreadsPerBlock > DeviceInfo.ThreadsPerBlock[device_id]) {
@@ -617,9 +681,24 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   if (team_num <= 0) {
     if (loop_tripcount > 0 && DeviceInfo.EnvNumTeams < 0) {
       if (KernelInfo->ExecutionMode == SPMD) {
+        // We have a combined construct, i.e. `target teams distribute parallel
+        // for [simd]`. We launch so many teams so that each thread will
+        // execute one iteration of the loop.
         // round up to the nearest integer
         cudaBlocksPerGrid = ((loop_tripcount - 1) / cudaThreadsPerBlock) + 1;
       } else {
+        // If we reach this point, then we have a non-combined construct, i.e.
+        // `teams distribute` with a nested `parallel for` and each team is
+        // assigned one iteration of the `distribute` loop. E.g.:
+        //
+        // #pragma omp target teams distribute
+        // for(...loop_tripcount...) {
+        //   #pragma omp parallel for
+        //   for(...) {}
+        // }
+        //
+        // Threads within a team will execute the iterations of the `parallel`
+        // loop.
         cudaBlocksPerGrid = loop_tripcount;
       }
       DP("Using %d teams due to loop trip count %" PRIu64 " and number of "
@@ -636,6 +715,14 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   } else {
     cudaBlocksPerGrid = team_num;
     DP("Using requested number of teams %d\n", team_num);
+  }
+
+  /*
+   * Temporary fix for kernels with teams reduction
+   */
+  if (KernelInfo->HasTeamsReduction && cudaBlocksPerGrid > 4096) {
+    DP("Limiting the number of teams to 4096 because of teams reduction.\n");
+    cudaBlocksPerGrid = 4096;
   }
 
   // Run on the device.
@@ -667,12 +754,12 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
-    void **tgt_args, int32_t arg_num) {
+    void **tgt_args, ptrdiff_t *tgt_offsets, int32_t arg_num) {
   // use one team and the default number of threads.
   const int32_t team_num = 1;
   const int32_t thread_limit = 0;
   return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
-      arg_num, team_num, thread_limit, 0);
+      tgt_offsets, arg_num, team_num, thread_limit, 0);
 }
 
 #ifdef __cplusplus
