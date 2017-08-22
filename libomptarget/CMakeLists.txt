@@ -96,10 +96,12 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   add_library(omptarget SHARED ${src_files})
 
   if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-     target_link_libraries(omptarget omp dl)
+     target_link_libraries(omptarget
+      omp
+      ${CMAKE_DL_LIBS})
   else()
     target_link_libraries(omptarget
-      dl
+      ${CMAKE_DL_LIBS}
       "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports")
   endif()
 
