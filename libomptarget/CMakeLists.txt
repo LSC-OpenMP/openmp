@@ -1,10 +1,10 @@
 ##===----------------------------------------------------------------------===##
-# 
+#
 #                     The LLVM Compiler Infrastructure
 #
 # This file is dual licensed under the MIT and the University of Illinois Open
 # Source Licenses. See LICENSE.txt for details.
-# 
+#
 ##===----------------------------------------------------------------------===##
 #
 # Build offloading library libomptarget.so.
@@ -24,8 +24,8 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}" OR
   project(libomptarget C CXX)
   set(LIBOMPTARGET_STANDALONE_BUILD TRUE)
 endif()
-  
-  
+
+
 if(${LIBOMPTARGET_STANDALONE_BUILD})
   set(LIBOMPTARGET_ENABLE_WERROR FALSE CACHE BOOL
     "Enable -Werror flags to turn warnings into errors for supporting compilers.")
@@ -67,16 +67,16 @@ set(LIBOMPTARGET_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # We need C++11 support.
 if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
-  
+
   libomptarget_say("Building offloading runtime library libomptarget.")
 
   # Enable support for C++11.
   add_definitions(-std=c++11)
-  
+
   if(LIBOMPTARGET_ENABLE_WERROR AND LIBOMPTARGET_HAVE_WERROR_FLAG)
     add_definitions(-Werror)
   endif()
-  
+
   # If building this library in debug mode, we define a macro to enable
   # dumping progress messages at runtime.
   string( TOLOWER "${CMAKE_BUILD_TYPE}" LIBOMPTARGET_CMAKE_BUILD_TYPE)
@@ -85,32 +85,34 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
     add_definitions(-g)
     add_definitions(-O0)
   endif()
-  
+
   set(src_files
     src/omptarget.cpp
   )
-  
+
   include_directories(src/)
-  
+
   # Build libomptarget library with libdl dependency.
   add_library(omptarget SHARED ${src_files})
 
   if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-     target_link_libraries(omptarget omp dl)
+     target_link_libraries(omptarget
+      omp
+      ${CMAKE_DL_LIBS})
   else()
     target_link_libraries(omptarget
-      dl
+      ${CMAKE_DL_LIBS}
       "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports")
   endif()
-  
+
   # Install libomptarget under the lib destination folder.
   if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     install(TARGETS omptarget RUNTIME DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
   else()
     install(TARGETS omptarget LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
   endif()
-  
-  # Retrieve the path to the resulting library so that it can be used for 
+
+  # Retrieve the path to the resulting library so that it can be used for
   # testing.
   get_target_property(LIBOMPTARGET_LIBRARY_DIR omptarget LIBRARY_OUTPUT_DIRECTORY)
   if(NOT LIBOMPTARGET_LIBRARY_DIR)
@@ -120,10 +122,10 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   # Build offloading plugins and device RTLs if they are available.
   add_subdirectory(plugins)
   add_subdirectory(deviceRTLs)
-  
+
   # Add tests.
   add_subdirectory(test)
-  
+
 else(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   libomptarget_say("Not building offloading runtime library libomptarget: host compiler must have c++11 support.")
 endif(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
