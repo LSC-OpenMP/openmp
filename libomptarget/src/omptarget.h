@@ -25,6 +25,8 @@
 #define OFFLOAD_DEVICE_DESTRUCTOR  -3
 #define HOST_DEVICE                -10
 
+#include <dlfcn.h>
+
 /// Data attributes for each data reference used in an OpenMP target region.
 enum tgt_map_type {
   // No flags
@@ -60,6 +62,11 @@ enum OpenMPOffloadingDeclareTargetFlags {
   OMP_DECLARE_TARGET_CTOR = 0x02,
   /// Mark the entry as being a global destructor.
   OMP_DECLARE_TARGET_DTOR = 0x04
+};
+
+struct __tgt_configuration {
+  int32_t sub_target_id;
+  char *module;
 };
 
 /// This struct is a record of an entry point or global. For a function

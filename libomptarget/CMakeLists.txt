@@ -109,9 +109,13 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   endif()
 
   # Install libomptarget under the lib destination folder.
-  install(TARGETS omptarget LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
-
-  # Retrieve the path to the resulting library so that it can be used for
+  if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    install(TARGETS omptarget RUNTIME DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+  else()
+    install(TARGETS omptarget LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
+  endif()
+  
+  # Retrieve the path to the resulting library so that it can be used for 
   # testing.
   get_target_property(LIBOMPTARGET_LIBRARY_DIR omptarget LIBRARY_OUTPUT_DIRECTORY)
   if(NOT LIBOMPTARGET_LIBRARY_DIR)

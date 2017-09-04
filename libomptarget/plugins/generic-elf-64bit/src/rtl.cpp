@@ -118,7 +118,7 @@ int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
 #if TARGET_ELF_ID < 1
   return 0;
 #else
-  return elf_check_machine(image, TARGET_ELF_ID);
+  return elf_check_machine(image, TARGET_ELF_ID, 0);
 #endif
 }
 
