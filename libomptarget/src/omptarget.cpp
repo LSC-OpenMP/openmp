@@ -35,17 +35,19 @@
 enum StaticDeviceId {
   SMARTNIC = 9001,
   HARP2    = 9002,
-  CLOUD    = 9003
+  CLOUD    = 9003,
+  HARP2SIM = 9004
 };
 
 // List of all plugins that can support offloading.
 static const char *RTLNames[] = {
-    /* PowerPC target    */ "libomptarget.rtl.ppc64.so",
-    /* x86_64 target     */ "libomptarget.rtl.x86_64.so",
-    /* CUDA target       */ "libomptarget.rtl.cuda.so",
-    /* AArch64 target    */ "libomptarget.rtl.aarch64.so",
-    /* SmartNIC target   */ "libomptarget.rtl.smartnic.so",
-    /* Intel HARP target */ "libomptarget.rtl.harp.so"};
+    /* PowerPC target       */ "libomptarget.rtl.ppc64.so",
+    /* x86_64 target        */ "libomptarget.rtl.x86_64.so",
+    /* CUDA target          */ "libomptarget.rtl.cuda.so",
+    /* AArch64 target       */ "libomptarget.rtl.aarch64.so",
+    /* SmartNIC target      */ "libomptarget.rtl.smartnic.so",
+    /* Intel HARP target    */ "libomptarget.rtl.harp.so",
+    /* Intel HARPSIM target */ "libomptarget.rtl.harpsim.so"};
 
 // forward declarations
 struct RTLInfoTy;
@@ -328,9 +330,10 @@ void RTLsTy::LoadRTLs() {
 
     if (strcmp(Name, "libomptarget.rtl.smartnic.so") == 0) {
       R.staticDeviceId = SMARTNIC;
-      printf("smartnic device id | id = %d\n", R.staticDeviceId);
     } else if (strcmp(Name, "libomptarget.rtl.harp.so") == 0) {
       R.staticDeviceId = HARP2;
+    } else if (strcmp(Name, "libomptarget.rtl.harpsim.so") == 0) {
+      R.staticDeviceId = HARP2SIM;
     }
 
 #ifdef OMPTARGET_DEBUG
