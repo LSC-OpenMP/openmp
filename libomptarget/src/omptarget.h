@@ -192,6 +192,8 @@ int __tgt_target_teams_nowait(int64_t device_id, void *host_ptr,
                               int32_t noAliasDepNum, void *noAliasDepList);
 void __kmpc_push_target_tripcount(int64_t device_id, uint64_t loop_tripcount);
 
+int __tgt_target_fpga(int64_t device_id, void *module);
+
 #ifdef __cplusplus
 }
 #endif

@@ -204,6 +204,7 @@ struct RTLInfoTy {
                                  int32_t);
   typedef int32_t(run_team_region_ty)(int32_t, void *, void **, ptrdiff_t *,
                                       int32_t, int32_t, int32_t, uint64_t);
+  typedef int32_t(set_module_ty)(void *);
 
   int32_t Idx;                     // RTL index, index is the number of devices
                                    // of other RTLs that were registered before,
@@ -231,6 +232,7 @@ struct RTLInfoTy {
   data_delete_ty *data_delete;
   run_region_ty *run_region;
   run_team_region_ty *run_team_region;
+  set_module_ty *set_module;
 
   // Are there images associated with this RTL.
   bool isUsed;
@@ -251,7 +253,7 @@ struct RTLInfoTy {
         is_valid_binary(0), number_of_devices(0), init_device(0),
         load_binary(0), data_alloc(0), data_submit(0), data_retrieve(0),
         data_delete(0), run_region(0), run_team_region(0), isUsed(false),
-        Mtx() {}
+        set_module(0), Mtx() {}
 
   RTLInfoTy(const RTLInfoTy &r) : Mtx() {
     Idx = r.Idx;
@@ -273,6 +275,7 @@ struct RTLInfoTy {
     run_region = r.run_region;
     run_team_region = r.run_team_region;
     isUsed = r.isUsed;
+    set_module = r.set_module;
   }
 };
 
@@ -370,6 +373,14 @@ void RTLsTy::LoadRTLs() {
     if (!(*((void**) &R.run_team_region) = dlsym(
               dynlib_handle, "__tgt_rtl_run_target_team_region")))
       continue;
+
+    if (R.staticDeviceId == SMARTNIC |
+        R.staticDeviceId == HARP2 |
+        R.staticDeviceId == HARP2SIM) {
+      if (!(*((void**) &R.set_module) = dlsym(
+                dynlib_handle, "__tgt_rtl_set_module")))
+        continue;
+    }
 
     // No devices are supported by this RTL?
     if (!(R.NumberOfDevices = R.number_of_devices())) {
@@ -1893,6 +1904,19 @@ EXTERN void __tgt_target_data_update_nowait(
 
   __tgt_target_data_update(device_id, arg_num, args_base, args, arg_sizes,
                            arg_types);
+}
+
+EXTERN int __tgt_target_fpga(int64_t device_id, void *module) {
+  device_id = translate_device_id(device_id);
+
+  if (Devices[device_id].RTL->staticDeviceId == SMARTNIC |
+    Devices[device_id].RTL->staticDeviceId == HARP2 |
+    Devices[device_id].RTL->staticDeviceId == HARP2SIM) {
+
+    Devices[device_id].RTL->set_module(module);
+  }
+
+  return 0;
 }
 
 /// performs the same actions as data_begin in case arg_num is
