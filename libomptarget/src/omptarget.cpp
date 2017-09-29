@@ -1906,19 +1906,6 @@ EXTERN void __tgt_target_data_update_nowait(
                            arg_types);
 }
 
-EXTERN int __tgt_target_fpga(int64_t device_id, void *module) {
-  device_id = translate_device_id(device_id);
-
-  if (Devices[device_id].RTL->staticDeviceId == SMARTNIC |
-    Devices[device_id].RTL->staticDeviceId == HARP2 |
-    Devices[device_id].RTL->staticDeviceId == HARP2SIM) {
-
-    Devices[device_id].RTL->set_module(module);
-  }
-
-  return 0;
-}
-
 /// performs the same actions as data_begin in case arg_num is
 /// non-zero and initiates run of the offloaded region on the target platform;
 /// if arg_num is non-zero after the region execution is done it also
@@ -1980,6 +1967,14 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
   __tgt_target_table *TargetTable = TM->Table->TargetsTable[device_id];
   TrlTblMtx.unlock();
   assert(TargetTable && "Global data has not been mapped\n");
+
+  // program the device if is an FPGA
+  if (Device.RTL->staticDeviceId == SMARTNIC ||
+    Device.RTL->staticDeviceId == HARP2 ||
+    Device.RTL->staticDeviceId == HARP2SIM) {
+
+    Device.RTL->set_module(TargetTable->EntriesBegin[TM->Index].module);
+  }
 
   // Move data to device.
   int rc = target_data_begin(Device, arg_num, args_base, args, arg_sizes,
