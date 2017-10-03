@@ -5,10 +5,10 @@ compiler:
 - clang
 - gcc
 before_install:
-- sudo apt-get -qq update 
+- sudo apt-get -qq update
 - sudo apt-get install -y libelf-dev
 script:
 - mkdir $TRAVIS_BUILD_DIR/build
 - cd $TRAVIS_BUILD_DIR/build
-- cmake $TRAVIS_BUILD_DIR
+- cmake $TRAVIS_BUILD_DIR -DOPENMP_ENABLE_LIBOMPTARGET=ON
 - make

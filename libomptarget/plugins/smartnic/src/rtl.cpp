@@ -18,7 +18,9 @@
 #include <vector>
 #include <ffi.h>
 #include <gelf.h>
+#ifndef __APPLE__
 #include <link.h>
+#endif
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -486,6 +488,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 
   DeviceInfo.DynLibs.push_back(Lib);
 
+#ifndef __APPLE__
   struct link_map *libInfo = (struct link_map *)Lib.Handle;
 
   // The place where the entries info is loaded is the library base address
@@ -510,6 +513,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   DP("Entries table range is (" DPxMOD ")->(" DPxMOD ")\n",
       DPxPTR(entries_begin), DPxPTR(entries_end));
   DeviceInfo.createOffloadTable(device_id, entries_begin, entries_end);
+#endif
 
   elf_end(e);
 
@@ -526,7 +530,7 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size) {
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     int64_t size) {
 
-  DP("[smartnic] __tgt_rtl_data_submit: %d\n", size);
+  DP("[smartnic] __tgt_rtl_data_submit: %" PRId64 "\n", size);
 
   socket_handle.write(hst_ptr, size);
 
