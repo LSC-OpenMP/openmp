@@ -27,7 +27,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
       # Install plugin under the lib destination folder.
       install(TARGETS omptarget.rtl.mpi LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
 
-      target_link_libraries(omptarget.rtl.cuda
+      target_link_libraries(omptarget.rtl.mpi
         ${LIBOMPTARGET_DEP_MPI_LIBRARIES}
         ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
         "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
