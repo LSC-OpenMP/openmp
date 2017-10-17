@@ -41,7 +41,7 @@ test:
     - cp -R $OPENMP_SRC $LLVM_SRC/projects/
   override:
     - mkdir build
-    - cd build && cmake $LLVM_SRC -DLLVM_TARGETS_TO_BUILD="X86" -DCMAKE_BUILD_TYPE=Release
+    - cd build && cmake $LLVM_SRC -DLLVM_TARGETS_TO_BUILD="X86" -DCMAKE_BUILD_TYPE=Release -DOPENMP_ENABLE_LIBOMPTARGET=ON
     - cd build && make
   post:
     - cd build && make check-libomptarget

@@ -33,11 +33,18 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
       install(TARGETS omptarget.rtl.smartnic LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
     endif()
 
-    target_link_libraries(omptarget.rtl.smartnic
-      ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
-      ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
-      dl
-      "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+    if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+      target_link_libraries(omptarget.rtl.smartnic
+        ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
+        ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+        dl)
+    else()
+      target_link_libraries(omptarget.rtl.smartnic
+        ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
+        ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+        dl
+        "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+    endif()
 
     # Report to the parent scope that we are building a plugin for SmartNIC.
     set(LIBOMPTARGET_SYSTEM_TARGETS "${LIBOMPTARGET_SYSTEM_TARGETS} x86_64" PARENT_SCOPE)

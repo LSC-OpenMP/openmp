@@ -19,7 +19,9 @@
  included and macro DP(...) has been defined.
 #endif
 
+#ifndef __APPLE__
 #include <elf.h>
+#endif
 #include <libelf.h>
 #include <gelf.h>
 #include <string.h>

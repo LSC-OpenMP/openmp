@@ -64,5 +64,8 @@ CMakeLists.txt.user
 #==============================================================================#
 runtime/exports
 
+libomptarget/deviceRTLs/spark
+libomptarget/deviceRTLs/target
+
 # Nested build directory
 /build

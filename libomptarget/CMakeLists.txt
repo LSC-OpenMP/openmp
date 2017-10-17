@@ -72,11 +72,7 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   libomptarget_say("Building offloading runtime library libomptarget.")
 
   # Enable support for C++11.
-  if(CMAKE_VERSION VERSION_LESS "3.1")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-  else()
-    set(CMAKE_CXX_STANDARD 11)
-  endif()
+  add_definitions(-std=c++11)
 
   if(LIBOMPTARGET_ENABLE_WERROR AND LIBOMPTARGET_HAVE_WERROR_FLAG)
     add_definitions(-Werror)
@@ -101,10 +97,12 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   add_library(omptarget SHARED ${src_files})
 
   if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-     target_link_libraries(omptarget omp dl)
+     target_link_libraries(omptarget
+      omp
+      ${CMAKE_DL_LIBS})
   else()
     target_link_libraries(omptarget
-      dl
+      ${CMAKE_DL_LIBS}
       "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports")
   endif()
 
@@ -114,8 +112,8 @@ if(LIBOMPTARGET_HAVE_STD_CPP11_FLAG)
   else()
     install(TARGETS omptarget LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
   endif()
-  
-  # Retrieve the path to the resulting library so that it can be used for 
+
+  # Retrieve the path to the resulting library so that it can be used for
   # testing.
   get_target_property(LIBOMPTARGET_LIBRARY_DIR omptarget LIBRARY_OUTPUT_DIRECTORY)
   if(NOT LIBOMPTARGET_LIBRARY_DIR)
