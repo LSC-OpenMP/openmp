@@ -13,7 +13,9 @@
 if(LIBOMPTARGET_DEP_LIBELF_FOUND)
   if(LIBOMPTARGET_DEP_LIBFFI_FOUND)
     if(LIBOMPTARGET_DEP_MPI_FOUND)
-      if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(ppc64le)|(aarch64)$" AND CMAKE_SYSTEM_NAME MATCHES "Linux")
+      if(CMAKE_SYSTEM_PROCESSOR MATCHES "(x86_64)|(ppc64le)|(aarch64)$" AND (CMAKE_SYSTEM_NAME MATCHES "Linux"
+        # Temporary allows building on MacOS for development
+        OR CMAKE_SYSTEM_NAME MATCHES "Darwin"))
 
         libomptarget_say("Building MPI offloading plugin.")
 
