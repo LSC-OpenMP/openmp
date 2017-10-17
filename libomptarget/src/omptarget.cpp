@@ -58,7 +58,8 @@ static const char *RTLNames[] = {
     /* CUDA target       */ "libomptarget.rtl.cuda.so",
     /* AArch64 target    */ "libomptarget.rtl.aarch64.so",
     /* SmartNIC target   */ "libomptarget.rtl.smartnic.so",
-    /* Intel HARP target */ "libomptarget.rtl.harp.so"};
+    /* Intel HARP target */ "libomptarget.rtl.harp.so",
+    /* MPI target        */ "libomptarget.rtl.mpi.so"};
 
 // forward declarations
 struct RTLInfoTy;
@@ -349,6 +350,8 @@ void RTLsTy::LoadRTLs() {
       R.staticDeviceId = SMARTNIC;
     } else if (strcmp(Name, "libomptarget.rtl.harp.so") == 0) {
       R.staticDeviceId = HARP2;
+    } else if (strcmp(Name, "libomptarget.rtl.mpi.so") == 0) {
+      R.staticDeviceId = MPI;
     }
 
 #ifdef OMPTARGET_DEBUG
