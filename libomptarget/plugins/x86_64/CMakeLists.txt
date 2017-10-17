@@ -13,7 +13,7 @@
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux"
   # Temporary allows building on MacOS for development
-  OR CMAKE_SYSTEM_NAME MATCHES "Darwin"))
+  OR CMAKE_SYSTEM_NAME MATCHES "Darwin")
   build_generic_elf64("x86_64" "x86_64" "x86_64" "x86_64-pc-linux-gnu" "62")
 else()
  libomptarget_say("Not building x86_64 offloading plugin: machine not found in the system.")
