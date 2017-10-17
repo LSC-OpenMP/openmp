@@ -346,7 +346,6 @@ void RTLsTy::LoadRTLs() {
 
     if (strcmp(Name, "libomptarget.rtl.smartnic.so") == 0) {
       R.staticDeviceId = SMARTNIC;
-      printf("smartnic device id | id = %d\n", R.staticDeviceId);
     } else if (strcmp(Name, "libomptarget.rtl.harp.so") == 0) {
       R.staticDeviceId = HARP2;
     }
