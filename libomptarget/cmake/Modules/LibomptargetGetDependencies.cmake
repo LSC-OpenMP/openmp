@@ -78,7 +78,9 @@ find_path (
     /usr/local/include
     /opt/local/include
     /sw/include
-    ENV CPATH)
+    ENV CPATH
+  PATH_SUFFIXES
+    ffi)
 
 # Don't bother look for the library if the header files were not found.
 if (LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIR)
