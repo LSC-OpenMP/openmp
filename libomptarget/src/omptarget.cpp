@@ -47,7 +47,8 @@ static int DebugLevel = 0;
 enum StaticDeviceId {
   SMARTNIC = 9001,
   HARP2    = 9002,
-  CLOUD    = 9003
+  CLOUD    = 9003,
+  MPI      = 9004
 };
 
 // List of all plugins that can support offloading.
