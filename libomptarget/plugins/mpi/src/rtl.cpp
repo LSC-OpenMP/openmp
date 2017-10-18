@@ -134,12 +134,7 @@ extern "C" {
 #endif
 
 int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
-// If we don't have a valid ELF ID we can just fail.
-#if TARGET_ELF_ID < 1
-  return 0;
-#else
-  return elf_check_machine(image, TARGET_ELF_ID, 0);
-#endif
+  return elf_check_machine(image, EM_X86_64, 9004);
 }
 
 int32_t __tgt_rtl_number_of_devices() { return NUMBER_OF_DEVICES; }
