@@ -22,6 +22,7 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <mpi.h>
 
 #include "omptargetplugin.h"
 
@@ -280,6 +281,26 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size) {
   memcpy(hst_ptr, tgt_ptr, size);
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+  int number = 0;
+  int message[4];
+  message[0] = 0;
+  if (world_rank != 0) { // worker
+          printf("**** [MPI-%d] On worker\n", world_rank);
+	  MPI_Recv(&message[0], 4, MPI_INT, 0, 0, MPI_COMM_WORLD,
+			  MPI_STATUS_IGNORE);
+	  while (message[0]) {
+		  number = message[1];
+                  printf("**** [MPI-%d] Exec result: %d\n", world_rank, number);
+
+		  // wait for more work
+		  MPI_Recv(&message[0], 4, MPI_INT, 0, 0, MPI_COMM_WORLD,
+				  MPI_STATUS_IGNORE);
+	  }  
+          printf("**** [MPI-%d] Ending process\n", world_rank);
+  } 
   return OFFLOAD_SUCCESS;
 }
 

@@ -36,6 +36,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
           ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
           ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
           dl
+          mpi_cxx
           "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
       else()
         libomptarget_say("Not building MPI offloading plugin: only support MPI in Linux x86_64, ppc64le and aarch64 hosts.")
