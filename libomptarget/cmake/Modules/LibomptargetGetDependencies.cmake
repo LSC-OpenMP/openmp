@@ -16,9 +16,20 @@
 # libffi : required to launch target kernels given function and argument
 #          pointers.
 # CUDA : required to control offloading to NVIDIA GPUs.
-# Intel HARP: required to control offloading to Intel HARP FPGAs.
+
+# Intel AAL
+# Intel AAL SDK: required to control offloading to Intel HARP FPGAs.
+
+# Intel OPAE
+# Intel OPAE: required to control offloading to Intel HARP FPGAs.
+# Intel OPAE ASE + BBB_CCI_MPF: required to control Intel ASE.
+# UUID : required by OPAE
+# boost program_options : required by OPAE
+# JSON-C : required by OPAE
 
 include (FindPackageHandleStandardArgs)
+include (FindUUID)
+include (FindJSON-C)
 
 ################################################################################
 # Looking for libelf...
@@ -125,7 +136,7 @@ mark_as_advanced(
   LIBOMPTARGET_DEP_CUDA_LIBRARIES)
 
 ################################################################################
-# Looking for Intel HARP...
+# Looking for Intel AAL SDK...
 ################################################################################
 find_path (
     LIBOMPTARGET_DEP_AALSDK_INCLUDE_DIRS
@@ -220,4 +231,172 @@ find_package_handle_standard_args(
 mark_as_advanced(
   LIBOMPTARGET_DEP_AALSDK_INCLUDE_DIRS
   LIBOMPTARGET_DEP_AALSDK_LIBRARIES)
+
+################################################################################
+# Looking for Intel OPAE ...
+################################################################################
+find_path (
+    LIBOMPTARGET_DEP_OPAE_INCLUDE_DIRS
+  NAMES
+    opae/fpga.h
+  PATHS
+    /usr/include
+    /usr/local/include
+    /opt/local/include
+    /sw/include
+    ${OPAE}/include
+    ENV CPATH)
+
+find_library (
+  LIBOMPTARGET_DEP_OPAE_OPAE_C_LIBRARY
+  NAMES
+    opae-c
+  PATHS
+    /usr/lib
+    /usr/local/lib
+    /opt/local/lib
+    /sw/lib
+    ${OPAE}/lib
+    ENV LIBRARY_PATH
+    ENV LD_LIBRARY_PATH)
+
+set(LIBOMPTARGET_DEP_OPAE_LIBRARIES
+  ${LIBOMPTARGET_DEP_OPAE_LIBRARIES}
+  ${LIBOMPTARGET_DEP_OPAE_OPAE_C_LIBRARY})
+
+find_package_handle_standard_args(
+  LIBOMPTARGET_DEP_OPAE
+  DEFAULT_MSG
+  LIBOMPTARGET_DEP_OPAE_LIBRARIES
+  LIBOMPTARGET_DEP_OPAE_INCLUDE_DIRS)
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_OPAE_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_OPAE_LIBRARIES)
+
+################################################################################
+# Looking for Intel OPAE ASE ...
+################################################################################
+find_path (
+    LIBOMPTARGET_DEP_OPAE_ASE_INCLUDE_DIRS
+  NAMES
+    opae/fpga.h
+  PATHS
+    /usr/include
+    /usr/local/include
+    /opt/local/include
+    /sw/include
+    ${OPAE}/include
+    ENV CPATH)
+
+find_library (
+  LIBOMPTARGET_DEP_OPAE_ASE_C_LIBRARY
+  NAMES
+    opae-c-ase
+  PATHS
+    /usr/lib
+    /usr/local/lib
+    /opt/local/lib
+    /sw/lib
+    ${OPAE}/lib
+    ENV LIBRARY_PATH
+    ENV LD_LIBRARY_PATH)
+
+set(LIBOMPTARGET_DEP_OPAE_ASE_LIBRARIES
+  ${LIBOMPTARGET_DEP_OPAE_ASE_LIBRARIES}
+  ${LIBOMPTARGET_DEP_OPAE_ASE_C_LIBRARY})
+
+find_package_handle_standard_args(
+  LIBOMPTARGET_DEP_OPAE_ASE
+  DEFAULT_MSG
+  LIBOMPTARGET_DEP_OPAE_ASE_LIBRARIES
+  LIBOMPTARGET_DEP_OPAE_ASE_INCLUDE_DIRS)
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_OPAE_ASE_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_OPAE_ASE_LIBRARIES)
+
+################################################################################
+# Looking for Intel BBB_CCI_MPF ...
+################################################################################
+find_path (
+    LIBOMPTARGET_DEP_BBB_CCI_MPF_INCLUDE_DIRS
+  NAMES
+    opae/mpf/mpf.h
+  PATHS
+    /usr/include
+    /usr/local/include
+    /opt/local/include
+    /sw/include
+    ${BBB_CCI_MPF}/include
+    ENV CPATH)
+
+find_library (
+  LIBOMPTARGET_DEP_BBB_CCI_MPF_MPF_LIBRARY
+  NAMES
+    MPF
+  PATHS
+    /usr/lib
+    /usr/local/lib
+    /opt/local/lib
+    /sw/lib
+    ${BBB_CCI_MPF}/lib
+    ENV LIBRARY_PATH
+    ENV LD_LIBRARY_PATH)
+
+set(LIBOMPTARGET_DEP_BBB_CCI_MPF_LIBRARIES
+  ${LIBOMPTARGET_DEP_BBB_CCI_MPF_LIBRARIES}
+  ${LIBOMPTARGET_DEP_BBB_CCI_MPF_MPF_LIBRARY})
+
+find_package_handle_standard_args(
+  LIBOMPTARGET_DEP_BBB_CCI_MPF
+  DEFAULT_MSG
+  LIBOMPTARGET_DEP_BBB_CCI_MPF_LIBRARIES
+  LIBOMPTARGET_DEP_BBB_CCI_MPF_INCLUDE_DIRS)
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_BBB_CCI_MPF_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_BBB_CCI_MPF_LIBRARIES)
+
+################################################################################
+# Looking for UUID ...
+################################################################################
+find_package(UUID QUIET)
+
+set(LIBOMPTARGET_DEP_UUID_FOUND ${UUID_FOUND})
+set(LIBOMPTARGET_DEP_UUID_LIBRARIES ${UUID_LIBRARIES})
+set(LIBOMPTARGET_DEP_UUID_INCLUDE_DIRS ${UUID_INCLUDE_DIRS})
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_UUID_FOUND
+  LIBOMPTARGET_DEP_UUID_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_UUID_LIBRARIES)
+
+################################################################################
+# Looking for BOOST ...
+################################################################################
+find_package(Boost COMPONENTS program_options QUIET)
+
+set(LIBOMPTARGET_DEP_BOOST_FOUND ${Boost_FOUND})
+set(LIBOMPTARGET_DEP_BOOST_LIBRARIES ${Boost_LIBRARIES})
+set(LIBOMPTARGET_DEP_BOOST_INCLUDE_DIRS ${Boost_INCLUDE_DIRS})
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_BOOST_FOUND
+  LIBOMPTARGET_DEP_BOOST_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_BOOST_LIBRARIES)
+
+################################################################################
+# Looking for JSON-C ...
+################################################################################
+find_package(JSON-C QUIET)
+
+set(LIBOMPTARGET_DEP_JSON-C_FOUND ${JSON-C_FOUND})
+set(LIBOMPTARGET_DEP_JSON-C_LIBRARIES ${JSON-C_LIBRARIES})
+set(LIBOMPTARGET_DEP_JSON-C_INCLUDE_DIRS ${JSON-C_INCLUDE_DIRS})
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_JSON-C_FOUND
+  LIBOMPTARGET_DEP_JSON-C_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_JSON-C_LIBRARIES)
 
