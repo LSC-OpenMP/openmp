@@ -25,6 +25,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
         include_directories(${LIBOMPTARGET_DEP_LIBELF_INCLUDE_DIRS})
         include_directories(${LIBOMPTARGET_DEP_LIBHDFS3_INCLUDE_DIRS})
         include_directories(${LIBOMPTARGET_DEP_ZLIB_INCLUDE_DIRS})
+        include_directories(${LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIR})
 
         add_library(
             inih SHARED inih/ini.c inih/INIReader.cpp)
@@ -50,7 +51,9 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
               ${LIBOMPTARGET_DEP_LIBHDFS3_LIBRARIES}
               ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
               ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
-              ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES})
+              ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
+              dl)
         else()
            target_link_libraries(omptarget.rtl.cloud
               inih
@@ -58,6 +61,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
               ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
               ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
               ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES}
+              ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
               dl
               "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
         endif()

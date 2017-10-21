@@ -1,31 +1,38 @@
-//===- RTLs/cloud/src/rtl.cpp - Target RTLs Implementation -------- C++ -*-===//
+//===-RTLs/generic-64bit/src/rtl.cpp - Target RTLs Implementation - C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// This file is dual licensed under the MIT and the University of Illinois Open
+// Source Licenses. See LICENSE.txt for details.
 //
 //===----------------------------------------------------------------------===//
 //
-// RTL for Apache Spark cloud cluster
+// RTL for generic 64-bit machine
 //
 //===----------------------------------------------------------------------===//
 
-#include <chrono>
+#include <cassert>
 #include <cstdio>
+#include <cstring>
 #include <cstdlib>
-#include <fstream>
-#include <thread>
-#include <unistd.h>
-
 #include <dlfcn.h>
+#include <ffi.h>
 #include <gelf.h>
 #ifndef __APPLE__
 #include <link.h>
 #endif
-#include <inttypes.h>
-#include <string.h>
+#include <list>
+#include <string>
+#include <vector>
 
+#include <fstream>
+#include <thread>
+#include <unistd.h>
+#include <chrono>
+#include <inttypes.h>
+
+#include "omptargetplugin.h"
+#include "rtl.h"
 #include "INIReader.h"
 #include "amazon.h"
 #include "azure.h"
@@ -33,19 +40,46 @@
 #include "cloud_util.h"
 #include "generic.h"
 #include "local.h"
-#include "omptarget.h"
-
 #include "provider.h"
-
-#include "rtl.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
 #endif
 
-#define GETNAME(name) #name
-#define GETNAME2(name) GETNAME(name)
-#define DP(...) DEBUGP("Target " GETNAME2(TARGET_NAME) " RTL", __VA_ARGS__)
+#ifndef TARGET_ELF_ID
+#define TARGET_ELF_ID 0
+#endif
+
+#ifdef OMPTARGET_DEBUG
+static int DebugLevel = 0;
+
+#define GETNAME2(name) #name
+#define GETNAME(name) GETNAME2(name)
+#define DP(...) \
+  do { \
+    if (DebugLevel > 0) { \
+      DEBUGP("Target " GETNAME(TARGET_NAME) " RTL", __VA_ARGS__); \
+    } \
+  } while (false)
+#else // OMPTARGET_DEBUG
+#define DP(...) {}
+#endif // OMPTARGET_DEBUG
+
+#include "../../common/elf_common.c"
+
+#define NUMBER_OF_DEVICES 4
+#define OFFLOADSECTIONNAME ".omp_offloading.entries"
+
+/// Array of Dynamic libraries loaded for this target.
+struct DynLibTy {
+  char *FileName;
+  void *Handle;
+};
+
+/// Keep entries table per device.
+struct FuncOrGblEntryTy {
+  __tgt_target_table Table;
+};
 
 static std::vector<struct ProviderListEntry> ExistingProviderList = {
     {"Local", createLocalProvider, "LocalProvider"},
@@ -55,138 +89,180 @@ static std::vector<struct ProviderListEntry> ExistingProviderList = {
 
 static std::vector<struct ProviderListEntry> ProviderList;
 
-static RTLDeviceInfoTy DeviceInfo;
-
 static std::string working_path;
 
 static char *library_tmpfile = strdup("/tmp/libompcloudXXXXXX");
 
-RTLDeviceInfoTy::RTLDeviceInfoTy() {
-  std::string ConfigPath = std::string(getenv(OMPCLOUD_CONF_ENV.c_str()));
-  reader = new INIReader(ConfigPath);
+int NumberOfDevices;
 
-  if (reader->ParseError() < 0) {
-    fprintf(stderr, "ERROR: Path to OmpCloud configuration seems wrong: %s\n",
-            ConfigPath.c_str());
-    exit(EXIT_FAILURE);
+/// Class containing all the device information.
+class RTLDeviceInfoTy {
+  std::vector<FuncOrGblEntryTy> FuncGblEntries;
+
+public:
+  std::list<DynLibTy> DynLibs;
+
+  INIReader *reader;
+
+  Verbosity verbose;
+
+  std::vector<SparkInfo> SparkClusters;
+  std::vector<CloudProvider *> Providers;
+  std::vector<std::string> AddressTables;
+  std::vector<ElapsedTime> ElapsedTimes;
+
+  std::vector<std::vector<std::thread>> submitting_threads;
+  std::vector<std::vector<std::thread>> retrieving_threads;
+
+  // Record entry point associated with device.
+  void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin,
+                          __tgt_offload_entry *end) {
+    assert(device_id < (int32_t)FuncGblEntries.size() &&
+           "Unexpected device id!");
+    FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+
+    E.Table.EntriesBegin = begin;
+    E.Table.EntriesEnd = end;
   }
 
-  std::string vmode = DeviceInfo.reader->Get("Spark", "VerboseMode", "info");
-  if (vmode == "debug") {
-    verbose = Verbosity::debug;
-  } else if (vmode == "info") {
-    verbose = Verbosity::info;
-  } else if (vmode == "quiet") {
-    verbose = Verbosity::quiet;
-  } else {
-    fprintf(stderr, "Warning: invalid verbose mode\n");
-    verbose = Verbosity::info;
-  }
+  // Return true if the entry is associated with device.
+  bool findOffloadEntry(int32_t device_id, void *addr) {
+    assert(device_id < (int32_t)FuncGblEntries.size() &&
+           "Unexpected device id!");
+    FuncOrGblEntryTy &E = FuncGblEntries[device_id];
 
-  char *tempdir = mkdtemp(strdup("/tmp/ompcloud.XXXXXX"));
-  if (tempdir == NULL) {
-    fprintf(stderr, "Error on mkdtemp\n");
-    exit(EXIT_FAILURE);
-  }
-  working_path = tempdir;
-  std::string cmd("mkdir -p " + working_path);
-
-  DP("%s\n", exec_cmd(cmd.c_str()).c_str());
-
-  NumberOfDevices = 0;
-
-  // Checking how many providers we have in the configuration file
-  for (auto entry : ExistingProviderList) {
-    if (reader->HasSection(entry.SectionName)) {
-      if (verbose != Verbosity::quiet)
-        DP("Provider '%s' detected in configuration file.\n",
-           entry.ProviderName.c_str());
-      ProviderList.push_back(entry);
-      NumberOfDevices++;
+    for (__tgt_offload_entry *i = E.Table.EntriesBegin, *e = E.Table.EntriesEnd;
+         i < e; ++i) {
+      if (i->addr == addr)
+        return true;
     }
+
+    return false;
   }
 
-  if (ProviderList.size() == 0) {
-    if (verbose != Verbosity::quiet) {
-      DP("No specific provider detected in configuration file.\n");
-      DP("Local provider will be used.\n");
+  // Return the pointer to the target entries table.
+  __tgt_target_table *getOffloadEntriesTable(int32_t device_id) {
+    assert(device_id < (int32_t)FuncGblEntries.size() &&
+           "Unexpected device id!");
+    FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+
+    return &E.Table;
+  }
+
+  RTLDeviceInfoTy(int32_t num_devices) {
+#ifdef OMPTARGET_DEBUG
+    if (char *envStr = getenv("LIBOMPTARGET_DEBUG")) {
+      DebugLevel = std::stoi(envStr);
     }
-    ProviderList.push_back(ExistingProviderList.front());
-    NumberOfDevices++;
-  }
+#endif // OMPTARGET_DEBUG
 
-  assert(NumberOfDevices == 1 && "Do not support more than 1 device!");
+    std::string ConfigPath = std::string(getenv(OMPCLOUD_CONF_ENV.c_str()));
+    reader = new INIReader(ConfigPath);
 
-  FuncGblEntries.resize(NumberOfDevices);
-  SparkClusters.resize(NumberOfDevices);
-  Providers.resize(NumberOfDevices);
-  ElapsedTimes = std::vector<ElapsedTime>(NumberOfDevices);
-  submitting_threads.resize(NumberOfDevices);
-  retrieving_threads.resize(NumberOfDevices);
-
-  for (int i = 0; i < NumberOfDevices; i++) {
-    char *tmpname = strdup((working_path + "/addresstable_XXXXXX").c_str());
-    int ret = mkstemp(tmpname);
-    if (ret < 0) {
-      perror("Cannot create address table file");
+    if (reader->ParseError() < 0) {
+      fprintf(stderr, "ERROR: Path to OmpCloud configuration seems wrong: %s\n",
+              ConfigPath.c_str());
       exit(EXIT_FAILURE);
     }
-    AddressTables.push_back(std::string(tmpname));
-  }
-}
 
-RTLDeviceInfoTy::~RTLDeviceInfoTy() {
-  if (verbose != Verbosity::quiet)
-    for (int i = 0; i < NumberOfDevices; i++) {
-      ElapsedTime &timing = DeviceInfo.ElapsedTimes[i];
-      DP("Uploading = %ds\n", timing.UploadTime);
-      DP("Downloading = %ds\n", timing.DownloadTime);
-      DP("Compression = %ds\n", timing.CompressionTime);
-      DP("Decompression = %ds\n", timing.DecompressionTime);
-      DP("Execution = %ds\n", timing.SparkExecutionTime);
+    std::string vmode = reader->Get("Spark", "VerboseMode", "info");
+    if (vmode == "debug") {
+      verbose = Verbosity::debug;
+    } else if (vmode == "info") {
+      verbose = Verbosity::info;
+    } else if (vmode == "quiet") {
+      verbose = Verbosity::quiet;
+    } else {
+      fprintf(stderr, "Warning: invalid verbose mode\n");
+      verbose = Verbosity::info;
     }
 
-  if (!DeviceInfo.SparkClusters[0].KeepTmpFiles)
-    remove_directory(working_path.c_str());
-}
+    char *tempdir = mkdtemp(strdup("/tmp/ompcloud.XXXXXX"));
+    if (tempdir == NULL) {
+      fprintf(stderr, "Error on mkdtemp\n");
+      exit(EXIT_FAILURE);
+    }
+    working_path = tempdir;
+    std::string cmd("mkdir -p " + working_path);
 
-void RTLDeviceInfoTy::createOffloadTable(int32_t device_id,
-                                         __tgt_offload_entry *begin,
-                                         __tgt_offload_entry *end) {
-  assert(device_id < FuncGblEntries.size() && "Unexpected device id!");
-  FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+    DP("%s\n", exec_cmd(cmd.c_str()).c_str());
 
-  E.Table.EntriesBegin = begin;
-  E.Table.EntriesEnd = end;
-}
+    NumberOfDevices = 0;
 
-bool RTLDeviceInfoTy::findOffloadEntry(int32_t device_id, void *addr) {
-  assert(device_id < FuncGblEntries.size() && "Unexpected device id!");
-  FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+    // Checking how many providers we have in the configuration file
+    for (auto entry : ExistingProviderList) {
+      if (reader->HasSection(entry.SectionName)) {
+        if (verbose != Verbosity::quiet)
+          DP("Provider '%s' detected in configuration file.\n",
+             entry.ProviderName.c_str());
+        ProviderList.push_back(entry);
+        NumberOfDevices++;
+      }
+    }
 
-  for (__tgt_offload_entry *i = E.Table.EntriesBegin, *e = E.Table.EntriesEnd;
-       i < e; ++i) {
-    if (i->addr == addr)
-      return true;
+    if (ProviderList.size() == 0) {
+      if (verbose != Verbosity::quiet) {
+        DP("No specific provider detected in configuration file.\n");
+        DP("Local provider will be used.\n");
+      }
+      ProviderList.push_back(ExistingProviderList.front());
+      NumberOfDevices++;
+    }
+
+    assert(NumberOfDevices == 1 && "Do not support more than 1 device!");
+
+    FuncGblEntries.resize(num_devices);
+    SparkClusters.resize(NumberOfDevices);
+    Providers.resize(NumberOfDevices);
+    ElapsedTimes = std::vector<ElapsedTime>(NumberOfDevices);
+    submitting_threads.resize(NumberOfDevices);
+    retrieving_threads.resize(NumberOfDevices);
+
+    for (int i = 0; i < NumberOfDevices; i++) {
+      char *tmpname = strdup((working_path + "/addresstable_XXXXXX").c_str());
+      int ret = mkstemp(tmpname);
+      if (ret < 0) {
+        perror("Cannot create address table file");
+        exit(EXIT_FAILURE);
+      }
+      AddressTables.push_back(std::string(tmpname));
+    }
   }
 
-  return false;
-}
+  ~RTLDeviceInfoTy() {
+    // Close dynamic libraries
+    for (auto &lib : DynLibs) {
+      if (lib.Handle) {
+        dlclose(lib.Handle);
+        remove(lib.FileName);
+      }
+    }
+    if (verbose != Verbosity::quiet)
+      for (int i = 0; i < NumberOfDevices; i++) {
+        ElapsedTime &timing = ElapsedTimes[i];
+        DP("Uploading = %ds\n", timing.UploadTime);
+        DP("Downloading = %ds\n", timing.DownloadTime);
+        DP("Compression = %ds\n", timing.CompressionTime);
+        DP("Decompression = %ds\n", timing.DecompressionTime);
+        DP("Execution = %ds\n", timing.SparkExecutionTime);
+      }
 
-__tgt_target_table *RTLDeviceInfoTy::getOffloadEntriesTable(int32_t device_id) {
-  assert(device_id < FuncGblEntries.size() && "Unexpected device id!");
-  FuncOrGblEntryTy &E = FuncGblEntries[device_id];
+    if (!SparkClusters[0].KeepTmpFiles)
+      remove_directory(working_path.c_str());
+  }
+};
 
-  return &E.Table;
-}
+static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int __tgt_rtl_device_type(int32_t device_id) { return 0; }
+int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
+  return elf_check_machine(image, EM_X86_64, 9003);
+}
 
-int __tgt_rtl_number_of_devices() { return DeviceInfo.NumberOfDevices; }
+int32_t __tgt_rtl_number_of_devices() { return NUMBER_OF_DEVICES; }
 
 int32_t __tgt_rtl_init_device(int32_t device_id) {
   int retval;
@@ -269,12 +345,11 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
   DeviceInfo.Providers[device_id]->parse_config(DeviceInfo.reader);
   DeviceInfo.Providers[device_id]->init_device();
 
-  return OFFLOAD_SUCCESS; // success
+  return OFFLOAD_SUCCESS;
 }
 
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
                                           __tgt_device_image *image) {
-
   char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
   char *tempdir = mkdtemp(tempdir_template);
   if (tempdir == NULL) {
@@ -286,30 +361,30 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   if (DeviceInfo.verbose == Verbosity::debug)
     DP("%s\n", exec_cmd(cmd.c_str()).c_str());
 
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Dev %d: load binary from 0x%llx image\n", device_id,
-       (long long)image->ImageStart);
+  DP("Dev %d: load binary from " DPxMOD " image\n", device_id,
+     DPxPTR(image->ImageStart));
 
-  assert(device_id >= 0 && device_id < DeviceInfo.NumberOfDevices &&
-         "bad dev id");
+  assert(device_id >= 0 && device_id < NUMBER_OF_DEVICES && "bad dev id");
 
   size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
   size_t NumEntries = (size_t)(image->EntriesEnd - image->EntriesBegin);
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Expecting to have %ld entries defined.\n", (long)NumEntries);
+  DP("Expecting to have %zd entries defined.\n", NumEntries);
 
-  // We do not need to set the ELF version because the caller of this function
-  // had to do that to decide the right runtime to use
+  // Is the library version incompatible with the header file?
+  if (elf_version(EV_CURRENT) == EV_NONE) {
+    DP("Incompatible ELF library!\n");
+    return NULL;
+  }
 
   // Obtain elf handler
   Elf *e = elf_memory((char *)image->ImageStart, ImageSize);
   if (!e) {
-    DP("ERROR: Unable to get ELF handle: %s!\n", elf_errmsg(-1));
+    DP("Unable to get ELF handle: %s!\n", elf_errmsg(-1));
     return NULL;
   }
 
   if (elf_kind(e) != ELF_K_ELF) {
-    DP("ERROR: Invalid Elf kind!\n");
+    DP("Invalid Elf kind!\n");
     elf_end(e);
     return NULL;
   }
@@ -321,7 +396,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   size_t shstrndx;
 
   if (elf_getshdrstrndx(e, &shstrndx)) {
-    DP("ERROR: Unable to get ELF strings index!\n");
+    DP("Unable to get ELF strings index!\n");
     elf_end(e);
     return NULL;
   }
@@ -330,44 +405,43 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
     GElf_Shdr hdr;
     gelf_getshdr(section, &hdr);
 
-    //    if
-    //    (!strcmp(elf_strptr(e,shstrndx,hdr.sh_name),".openmptgt_host_entries")){
-    if (!strcmp(elf_strptr(e, shstrndx, hdr.sh_name), ".omptgt_hst_entr")) {
+    if (!strcmp(elf_strptr(e, shstrndx, hdr.sh_name), OFFLOADSECTIONNAME)) {
       entries_offset = hdr.sh_addr;
       break;
     }
   }
 
   if (!entries_offset) {
-    DP("ERROR: Entries Section Offset Not Found\n");
+    DP("Entries Section Offset Not Found\n");
     elf_end(e);
-    exit(EXIT_FAILURE);
+    return NULL;
   }
 
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Offset of entries section is (%016lx).\n", entries_offset);
+  DP("Offset of entries section is (" DPxMOD ").\n", DPxPTR(entries_offset));
 
   // load dynamic library and get the entry points. We use the dl library
-  // to do the loading of the library, but we could do it directly to avoid
-  // the dump to the temporary file.
+  // to do the loading of the library, but we could do it directly to avoid the
+  // dump to the temporary file.
   //
-  // 1) Create tmp file with the library contents
-  // 2) Use dlopen to load the file and dlsym to retrieve the symbols
+  // 1) Create tmp file with the library contents.
+  // 2) Use dlopen to load the file and dlsym to retrieve the symbols.
   int tmp_fd = mkstemp(library_tmpfile);
+
   if (tmp_fd == -1) {
     elf_end(e);
     perror("Error when creating temporary library file");
-    exit(EXIT_FAILURE);
+    return NULL;
   }
 
   if (DeviceInfo.verbose != Verbosity::quiet)
     DP("Library will be written in %s\n", library_tmpfile);
 
   FILE *ftmp = fdopen(tmp_fd, "wb");
+
   if (!ftmp) {
     elf_end(e);
     perror("Error when opening temporary library file");
-    exit(EXIT_FAILURE);
+    return NULL;
   }
 
   fwrite(image->ImageStart, ImageSize, 1, ftmp);
@@ -376,10 +450,12 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   DynLibTy Lib = {library_tmpfile, dlopen(library_tmpfile, RTLD_LAZY)};
 
   if (!Lib.Handle) {
-    fprintf(stderr, "Target library loading error: %s\n", dlerror());
+    DP("Target library loading error: %s\n", dlerror());
     elf_end(e);
-    exit(EXIT_FAILURE);
+    return NULL;
   }
+
+  DeviceInfo.DynLibs.push_back(Lib);
 
 #ifndef __APPLE__
   struct link_map *libInfo = (struct link_map *)Lib.Handle;
@@ -388,45 +464,34 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   // plus the offset determined from the ELF file.
   Elf64_Addr entries_addr = libInfo->l_addr + entries_offset;
 
-  if (DeviceInfo.SparkClusters[device_id].VerboseMode != Verbosity::quiet)
-    DP("Pointer to first entry to be loaded is (%016lx).\n", entries_addr);
+  DP("Pointer to first entry to be loaded is (" DPxMOD ").\n",
+      DPxPTR(entries_addr));
 
-  // Table of pointers to all the entries in the target
+  // Table of pointers to all the entries in the target.
   __tgt_offload_entry *entries_table = (__tgt_offload_entry *)entries_addr;
 
   __tgt_offload_entry *entries_begin = &entries_table[0];
-
-  if (DeviceInfo.verbose != Verbosity::quiet) {
-    DP("Entry begin: (%016lx)\nEntry name: (%s)\nEntry size: (%016lx)\n",
-       (uintptr_t)entries_begin->addr, entries_begin->name,
-       entries_begin->size);
-  }
-  // DP("Next entry: (%016lx)\nEntry name: (%s)\nEntry size: (%016lx)\n",
-  //   (uintptr_t)entries_table[1].addr, entries_table[1].name,
-  //   entries_table[1].size);
-
   __tgt_offload_entry *entries_end = entries_begin + NumEntries;
 
   if (!entries_begin) {
-    fprintf(stderr, "ERROR: Can't obtain entries begin\n");
+    DP("Can't obtain entries begin\n");
     elf_end(e);
-    exit(EXIT_FAILURE);
+    return NULL;
   }
 
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Entries table range is (%016lx)->(%016lx)\n", (Elf64_Addr)entries_begin,
-       (Elf64_Addr)entries_end)
+  DP("Entries table range is (" DPxMOD ")->(" DPxMOD ")\n",
+      DPxPTR(entries_begin), DPxPTR(entries_end));
   DeviceInfo.createOffloadTable(device_id, entries_begin, entries_end);
 
   elf_end(e);
-
 #endif
 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
-void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type,
-                           int32_t id) {
+void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr) {
+  int id = 0; // TODO: need an id?
+
   if (id >= 0) {
     // Write entry in the address table
     std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
@@ -437,7 +502,7 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, int32_t type,
       DP("Adding '%d' of size %ld to the address table\n", id, size);
   }
 
-  return DeviceInfo.Providers[device_id]->data_alloc(size, type, id);
+  return DeviceInfo.Providers[device_id]->data_alloc(size, 0 /*FIXME: type*/, 0/*FIXME: id*/);
 }
 
 static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
@@ -589,7 +654,9 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 }
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
-                              int64_t size, int32_t id) {
+                              int64_t size) {
+  int id = 0; // TODO: How to get the variable id?
+
   if (id < 0) {
     if (DeviceInfo.verbose != Verbosity::quiet)
       DP("No need to submit pointer\n");
@@ -605,7 +672,9 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
-                                int64_t size, int32_t id) {
+                                int64_t size) {
+  int id = 0; // TODO: How to get the variable id?
+
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
     DeviceInfo.retrieving_threads[device_id].push_back(
         std::thread(data_retrieve, device_id, hst_ptr, tgt_ptr, size, id));
@@ -616,7 +685,9 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   return OFFLOAD_SUCCESS;
 }
 
-int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {
+int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
+  int id = 0; // TODO: How to get the variable id?
+
   if (id < 0) {
     if (DeviceInfo.verbose != Verbosity::quiet)
       DP("No file to delete\n");
@@ -630,64 +701,45 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr, int32_t id) {
   return OFFLOAD_SUCCESS;
 }
 
-int32_t __tgt_rtl_run_barrier_end(int32_t device_id) {
-  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
-    for (auto it = DeviceInfo.retrieving_threads[device_id].begin();
-         it != DeviceInfo.retrieving_threads[device_id].end(); it++) {
-      (*it).join();
-    }
-    DeviceInfo.retrieving_threads[device_id].clear();
+int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
+    void **tgt_args, ptrdiff_t *tgt_offsets, int32_t arg_num, int32_t team_num,
+    int32_t thread_limit, uint64_t loop_tripcount /*not used*/) {
+  // ignore team num and thread limit.
+
+  // Use libffi to launch execution.
+  ffi_cif cif;
+
+  // All args are references.
+  std::vector<ffi_type *> args_types(arg_num, &ffi_type_pointer);
+  std::vector<void *> args(arg_num);
+  std::vector<void *> ptrs(arg_num);
+
+  for (int32_t i = 0; i < arg_num; ++i) {
+    ptrs[i] = (void *)((intptr_t)tgt_args[i] + tgt_offsets[i]);
+    args[i] = &ptrs[i];
   }
+
+  ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_num,
+                                   &ffi_type_void, &args_types[0]);
+
+  assert(status == FFI_OK && "Unable to prepare target launch!");
+
+  if (status != FFI_OK)
+    return OFFLOAD_FAIL;
+
+  DP("Running entry point at " DPxMOD "...\n", DPxPTR(tgt_entry_ptr));
+
+  void (*entry)(void);
+  *((void**) &entry) = tgt_entry_ptr;
+  ffi_call(&cif, entry, NULL, &args[0]);
   return OFFLOAD_SUCCESS;
 }
 
-int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
-                                         void **tgt_args, int32_t arg_num,
-                                         int32_t team_num,
-                                         int32_t thread_limit) {
-  ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
-
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Send library and address table to the Spark driver\n");
-
-  const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
-  DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
-
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Send Library: %s\n", library_tmpfile);
-  DeviceInfo.Providers[device_id]->send_file(library_tmpfile, "libmr.so");
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Done!\n");
-
-  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
-    remove(fileName);
-
-  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
-    for (auto it = DeviceInfo.submitting_threads[device_id].begin();
-         it != DeviceInfo.submitting_threads[device_id].end(); it++) {
-      (*it).join();
-    }
-    DeviceInfo.submitting_threads[device_id].clear();
-  }
-
-  auto t_start = std::chrono::high_resolution_clock::now();
-  int32_t ret_val = DeviceInfo.Providers[device_id]->submit_job();
-  auto t_end = std::chrono::high_resolution_clock::now();
-  auto t_delay =
-      std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
-  timing.SparkExecutionTime += t_delay;
-
-  if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Spark job executed in %lds\n", t_delay);
-
-  return ret_val;
-}
-
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
-                                    void **tgt_args, int32_t arg_num) {
-  // use one team and one thread
+    void **tgt_args, ptrdiff_t *tgt_offsets, int32_t arg_num) {
+  // use one team and one thread.
   return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
-                                          arg_num, 1, 1);
+      tgt_offsets, arg_num, 1, 1, 0);
 }
 
 #ifdef __cplusplus

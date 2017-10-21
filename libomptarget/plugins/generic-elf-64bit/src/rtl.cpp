@@ -18,7 +18,9 @@
 #include <dlfcn.h>
 #include <ffi.h>
 #include <gelf.h>
+#ifndef __APPLE__
 #include <link.h>
+#endif
 #include <list>
 #include <string>
 #include <vector>
@@ -241,6 +243,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 
   DeviceInfo.DynLibs.push_back(Lib);
 
+#ifndef __APPLE__
   struct link_map *libInfo = (struct link_map *)Lib.Handle;
 
   // The place where the entries info is loaded is the library base address
@@ -267,6 +270,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   DeviceInfo.createOffloadTable(device_id, entries_begin, entries_end);
 
   elf_end(e);
+#endif
 
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }

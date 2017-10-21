@@ -39,12 +39,20 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "${tmachine}$")
       install(TARGETS "omptarget.rtl.${tmachine_libname}"
         LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
 
-      target_link_libraries(
-        "omptarget.rtl.${tmachine_libname}"
-        ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
-        ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
-        dl
-        "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+      if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        target_link_libraries(
+          "omptarget.rtl.${tmachine_libname}"
+           ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
+           ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+           dl)
+      else()
+        target_link_libraries(
+          "omptarget.rtl.${tmachine_libname}"
+          ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
+          ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+          dl
+          "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
+       endif()
 
       # Report to the parent scope that we are building a plugin.
       set(LIBOMPTARGET_SYSTEM_TARGETS
