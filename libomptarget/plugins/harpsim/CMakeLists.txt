@@ -25,12 +25,12 @@ if(LIBOMPTARGET_DEP_BOOST_FOUND)
     add_definitions(-DHARPSIM_ERROR_REPORT)
   endif()
 
-  include_directories(LIBOMPTARGET_DEP_LIBELF_INCLUDE_DIRS)
-  include_directories(LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIRS)
-  include_directories(LIBOMPTARGET_DEP_OPAE_ASE_INCLUDE_DIRS)
-  include_directories(LIBOMPTARGET_DEP_BBB_CCI_MPF_INCLUDE_DIRS)
-  include_directories(LIBOMPTARGET_DEP_UUID_INCLUDE_DIRS)
-  include_directories(LIBOMPTARGET_DEP_BOOST_INCLUDE_DIRS)
+  include_directories(${LIBOMPTARGET_DEP_LIBELF_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_OPAE_ASE_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_BBB_CCI_MPF_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_UUID_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_BOOST_INCLUDE_DIRS})
 
   add_library(omptarget.rtl.harpsim SHARED
               src/util/opae_generic_app.cpp
@@ -43,7 +43,6 @@ if(LIBOMPTARGET_DEP_BOOST_FOUND)
     install(TARGETS omptarget.rtl.harpsim LIBRARY DESTINATION lib${LIBOMPTARGET_LIBDIR_SUFFIX})
   endif()
 
-  # ${LIBOMPTARGET_DEP_LIBAALSDK_LIBRARIES}
   target_link_libraries(omptarget.rtl.harpsim
     ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
     ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
