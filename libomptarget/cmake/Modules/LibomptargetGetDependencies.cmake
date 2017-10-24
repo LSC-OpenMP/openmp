@@ -300,3 +300,10 @@ find_package_handle_standard_args(
 mark_as_advanced(
   LIBOMPTARGET_DEP_SBT_EXECUTABLE
 )
+
+
+################################################################################
+# Looking for threads...
+################################################################################
+
+find_package(THREADS QUIET)

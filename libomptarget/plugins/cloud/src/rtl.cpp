@@ -265,7 +265,6 @@ int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
 int32_t __tgt_rtl_number_of_devices() { return NUMBER_OF_DEVICES; }
 
 int32_t __tgt_rtl_init_device(int32_t device_id) {
-  int retval;
 
   if (DeviceInfo.verbose != Verbosity::quiet)
     DP("Initializing device %d\n", device_id);

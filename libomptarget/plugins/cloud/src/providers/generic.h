@@ -37,6 +37,7 @@ protected:
 
 public:
   GenericProvider(SparkInfo sparkInfo) : CloudProvider(sparkInfo) {}
+  ~GenericProvider() {}
 
   virtual int32_t parse_config(INIReader *reader);
   virtual int32_t init_device();

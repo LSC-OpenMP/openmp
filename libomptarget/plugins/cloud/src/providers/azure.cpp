@@ -189,7 +189,7 @@ int32_t AzureProvider::submit_job() {
 
   rc = ssh_userauth_publickey_auto(aws_session, spark.UserName.c_str(), NULL);
   if (rc == SSH_AUTH_ERROR) {
-    ssh_key pkey;
+    ssh_key pkey = nullptr;
 
     // ssh_pki_import_privkey_file(ainfo.KeyFile.c_str(), NULL, NULL, NULL,
     // &pkey);

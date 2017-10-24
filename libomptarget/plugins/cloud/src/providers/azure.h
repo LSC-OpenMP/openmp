@@ -34,6 +34,7 @@ private:
 
 public:
   AzureProvider(SparkInfo resources) : CloudProvider(resources) {}
+  ~AzureProvider() {}
 
   std::string get_keys();
   std::string get_cloud_path(std::string filename);

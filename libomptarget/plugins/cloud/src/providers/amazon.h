@@ -35,6 +35,7 @@ private:
 
 public:
   AmazonProvider(SparkInfo resources) : CloudProvider(resources) {}
+  ~AmazonProvider() {}
 
   std::string get_keys();
   std::string get_cloud_path(std::string filename);
