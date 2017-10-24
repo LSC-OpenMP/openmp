@@ -53,6 +53,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
               ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
               ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES}
               ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
+              ${CMAKE_THREAD_LIBS_INIT}
               dl)
         else()
            target_link_libraries(omptarget.rtl.cloud
@@ -62,6 +63,7 @@ if(LIBOMPTARGET_DEP_LIBELF_FOUND)
               ${LIBOMPTARGET_DEP_LIBSSH_LIBRARIES}
               ${LIBOMPTARGET_DEP_ZLIB_LIBRARIES}
               ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
+              ${CMAKE_THREAD_LIBS_INIT}
               dl
               "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
         endif()
