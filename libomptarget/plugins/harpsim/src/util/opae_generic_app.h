@@ -25,13 +25,17 @@
 
 #define DSM_SIZE                 MB(4)
 #define DSM_STATUS_COMPLETE      0x40
-#define CSR_SRC_ADDR             0x0120
-#define CSR_DST_ADDR             0x0128
-#define CSR_CTL                  0x0138
-#define CSR_CFG                  0x0140
-#define CSR_NUM_LINES            0x0130
+
+#define CTL_ASSERT_RST           0
+#define CTL_DEASSERT_RST         1
+#define CTL_START                3
+#define CTL_STOP                 7
+
+// csr - memory map
 #define CSR_AFU_DSM_BASEL        0x0110
 #define CSR_AFU_DSM_BASEH        0x0114
+#define CSR_CTL                  0x0118
+#define CSR_BASE_BUFFER          0x0120
 
 struct Buffer {
   size_t     size;   /// workspace size in bytes.
@@ -54,7 +58,7 @@ public:
   int init();
   int finish();
   void* alloc_buffer(uint64_t size);
-  void delete_buffer();
+  void delete_buffer(void *tgt_ptr);
 
   int run();    ///< Return 0 if success
   int program(const char *module);

@@ -73,8 +73,6 @@ int OPAEGenericApp::init() {
   r = fpgaGetIOAddress(handle, dsm.wsid, &dsm.m_phys);
   if (FPGA_OK != r) return 1;
 
-  // ::memset(dsm.m_virt, 0, dsm.size);
-
   return 0;
 }
 
@@ -96,20 +94,26 @@ void* OPAEGenericApp::alloc_buffer(uint64_t size) {
   r = fpgaGetIOAddress(handle, buffer.wsid, &buffer.m_phys);
   if (FPGA_OK != r) return NULL;
 
-  // ::memset(buffer.m_virt, 0, buffer.size);
+  ::memset(buffer.m_virt, 0, buffer.size);
 
   buffers.push_front(buffer);
 
   return buffer.m_virt;
 }
 
-void OPAEGenericApp::delete_buffer() {
-  fpgaReleaseBuffer(handle, buffers.front().wsid);
+void OPAEGenericApp::delete_buffer(void *tgt_ptr) {
+  for(int i = 0; buffers.size(); i++) {
+    if (buffers[i].m_virt == tgt_ptr) {
+      fpgaReleaseBuffer(handle, buffers[i].wsid);
 
-  buffers.pop_front();
+      buffers.erase(buffers.begin() + i);
 
-  if (buffers.empty())
-    this->finish();
+      if (buffers.empty())
+        this->finish();
+
+      return;
+    }
+  }
 }
 
 int OPAEGenericApp::finish() {
@@ -130,9 +134,6 @@ int OPAEGenericApp::program(const char *module) {
 
 int OPAEGenericApp::run() {
 
-  Buffer buffer_in = buffers[0];
-  Buffer buffer_out = buffers[1];
-
   volatile int* StatusAddr =
     (volatile int*) (dsm.m_virt + DSM_STATUS_COMPLETE);
 
@@ -144,25 +145,22 @@ int OPAEGenericApp::run() {
   fpgaWriteMMIO64(handle, 0, CSR_AFU_DSM_BASEL, dsm.m_phys);
 
   // Assert AFU reset
-  fpgaWriteMMIO64(handle, 0, CSR_CTL, 0);
+  fpgaWriteMMIO64(handle, 0, CSR_CTL, CTL_ASSERT_RST);
 
-  //De-Assert AFU reset
-  fpgaWriteMMIO64(handle, 0, CSR_CTL, 1);
+  // De-Assert AFU reset
+  fpgaWriteMMIO64(handle, 0, CSR_CTL, CTL_DEASSERT_RST);
 
-  // Set the test mode
-  fpgaWriteMMIO64(handle, 0, CSR_CFG, 0);
+  for (int i = 0; i < buffers.size(); i++) {
+    int pos = buffers.size() - i - 1;
 
-  // Set input workspace address
-  fpgaWriteMMIO64(handle, 0, CSR_SRC_ADDR, buffer_in.m_phys/CL(1));
-
-  // Set output workspace address
-  fpgaWriteMMIO64(handle, 0, CSR_DST_ADDR, buffer_out.m_phys/CL(1));
-
-  // Set the number of cache lines for the test
-  fpgaWriteMMIO64(handle, 0, CSR_NUM_LINES, buffer_in.size/CL(1));
+    fpgaWriteMMIO64(handle, 0, CSR_BASE_BUFFER + 0x10*i,
+      buffers[pos].m_phys/CL(1));
+    fpgaWriteMMIO64(handle, 0, CSR_BASE_BUFFER + 0x10*i + 0x08,
+      buffers[pos].size/CL(1));
+  }
 
   // Start the test
-  fpgaWriteMMIO64(handle, 0, CSR_CTL, 3);
+  fpgaWriteMMIO64(handle, 0, CSR_CTL, CTL_START);
 
   // Wait for test completion
   while( 0 == ((*StatusAddr)&0x1) ) {
@@ -170,7 +168,11 @@ int OPAEGenericApp::run() {
   }
 
   // Stop the device
-  fpgaWriteMMIO64(handle, 0, CSR_CTL, 7);
+  fpgaWriteMMIO64(handle, 0, CSR_CTL, CTL_STOP);
+
+  for (int i = 0; i < buffers.size(); i++) {
+    fprintf(stderr, "buffer[%d] = %d\n", i, ((int*)buffers[i].m_virt)[0]);
+  }
 
   return 0;
 }

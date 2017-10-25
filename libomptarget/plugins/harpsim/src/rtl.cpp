@@ -343,7 +343,7 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
   DP("[harpsim] __tgt_rtl_delete\n");
 
   TIME_START
-  opae_generic_app.delete_buffer();
+  opae_generic_app.delete_buffer(tgt_ptr);
   TIME_PRINT("delete")
 
   return OFFLOAD_SUCCESS;
