@@ -275,32 +275,28 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr) {
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                               int64_t size) {
   memcpy(tgt_ptr, hst_ptr, size);
+
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  if (world_rank == 0) { // host
+    printf("**** [MPI-%d] Host sending -> data size: %d\n", world_rank, (int)size);
+    MPI_Send(hst_ptr, size, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
+  }
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size) {
   memcpy(hst_ptr, tgt_ptr, size);
+
   int world_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  if (world_rank == 0) { // host
+    printf("**** [MPI-%d] Host received -> data size: %d\n", world_rank, (int)size);
+    MPI_Recv(tgt_ptr, size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
 
-  int number = 0;
-  int message[4];
-  message[0] = 0;
-  if (world_rank != 0) { // worker
-          printf("**** [MPI-%d] On worker\n", world_rank);
-	  MPI_Recv(&message[0], 4, MPI_INT, 0, 0, MPI_COMM_WORLD,
-			  MPI_STATUS_IGNORE);
-	  while (message[0]) {
-		  number = message[1];
-                  printf("**** [MPI-%d] Exec result: %d\n", world_rank, number);
-
-		  // wait for more work
-		  MPI_Recv(&message[0], 4, MPI_INT, 0, 0, MPI_COMM_WORLD,
-				  MPI_STATUS_IGNORE);
-	  }  
-          printf("**** [MPI-%d] Ending process\n", world_rank);
-  } 
   return OFFLOAD_SUCCESS;
 }
 
