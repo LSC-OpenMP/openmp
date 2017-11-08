@@ -35,7 +35,8 @@
 enum StaticDeviceId {
   SMARTNIC = 9001,
   HARP2    = 9002,
-  CLOUD    = 9003
+  CLOUD    = 9003,
+  OPENCL   = 9004
 };
 
 // List of all plugins that can support offloading.
@@ -45,7 +46,8 @@ static const char *RTLNames[] = {
     /* CUDA target       */ "libomptarget.rtl.cuda.so",
     /* AArch64 target    */ "libomptarget.rtl.aarch64.so",
     /* SmartNIC target   */ "libomptarget.rtl.smartnic.so",
-    /* Intel HARP target */ "libomptarget.rtl.harp.so"};
+    /* Intel HARP target */ "libomptarget.rtl.harp.so"
+    /* OpenCL target     */ "libomptaret.rtl.opencl.so"};
 
 // forward declarations
 struct RTLInfoTy;
