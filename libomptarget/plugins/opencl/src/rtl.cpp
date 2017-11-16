@@ -352,155 +352,6 @@ void deviceDetails(cl_device_id id, cl_device_info param_name,
   }
 }
 
-///
-///  Attempt to create the program object from a cached binary.
-///
-cl_program createFromBinary(cl_context context, cl_device_id device,
-                            const char *fileName) {
-
-  FILE *fp = fopen(fileName, "rb");
-  if (fp == NULL) {
-    return NULL;
-  }
-
-  // Determine the size of the binary
-  size_t binarySize;
-  fseek(fp, 0, SEEK_END);
-  binarySize = ftell(fp);
-  rewind(fp);
-
-  unsigned char *programBinary = calloc(binarySize, sizeof(unsigned char));
-  fread(programBinary, 1, binarySize, fp);
-  fclose(fp);
-
-  cl_int errNum = 0;
-  cl_program program;
-  cl_int binaryStatus;
-
-  program = clCreateProgramWithBinary(context, 1, &device, &binarySize,
-                                      (const unsigned char **)&programBinary,
-                                      &binaryStatus, &errNum);
-
-  free(programBinary);
-
-  if (errNum != CL_SUCCESS) {
-    fprintf(stderr, "<rtl> Error loading binary %s.\n", fileName);
-    return NULL;
-  }
-
-  if (binaryStatus != CL_SUCCESS) {
-    fprintf(stderr, "<rtl> Invalid binary %s for device.\n", fileName);
-    return NULL;
-  }
-
-  const char *flags = NULL;
-  if (_spir_support) {
-    flags = "-x spir";
-  }
-  errNum = clBuildProgram(program, 1, &device, flags, NULL, NULL);
-
-  if (errNum != CL_SUCCESS) {
-    // Determine the reason for the error
-    char buildLog[16384];
-    clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG,
-                          sizeof(buildLog), buildLog, NULL);
-    if (!_spir_support) {
-      fprintf(
-          stderr,
-          "<rtl> %s: This platform does not support cl_khr_spir extension!\n",
-          buildLog);
-    } else {
-      fprintf(stderr, "<rtl> Error building %s : %s\n", fileName, buildLog);
-    }
-    clReleaseProgram(program);
-    return NULL;
-  }
-  return program;
-}
-
-///
-///  Retrieve program binary for all of the devices attached to
-///  the program and store the one for the device passed in
-///
-int saveToBinary(cl_program program, cl_device_id device,
-                 const char *fileName) {
-  cl_uint numDevices = 0;
-  cl_int errNum;
-
-  // 1 - Query for number of devices attached to program
-  errNum = clGetProgramInfo(program, CL_PROGRAM_NUM_DEVICES, sizeof(cl_uint),
-                            &numDevices, NULL);
-  if (errNum != CL_SUCCESS) {
-    fprintf(stderr, "<rtl> Error querying for number of devices.\n");
-    return 0;
-  }
-
-  // 2 - Get all of the Device IDs
-  cl_device_id *devices = calloc(numDevices, sizeof(cl_device_id));
-  errNum = clGetProgramInfo(program, CL_PROGRAM_DEVICES,
-                            sizeof(cl_device_id) * numDevices, devices, NULL);
-  if (errNum != CL_SUCCESS) {
-    fprintf(stderr, "<rtl> Error querying for devices.\n");
-    free(devices);
-    return 0;
-  }
-
-  // 3 - Determine the size of each program binary
-  size_t *programBinarySizes = calloc(numDevices, sizeof(size_t));
-  errNum =
-      clGetProgramInfo(program, CL_PROGRAM_BINARY_SIZES,
-                       sizeof(size_t) * numDevices, programBinarySizes, NULL);
-  if (errNum != CL_SUCCESS) {
-    fprintf(stderr, "<rtl> Error querying for program binary sizes.\n");
-    free(devices);
-    free(programBinarySizes);
-    return 0;
-  }
-
-  unsigned char **programBinaries = calloc(numDevices, sizeof(unsigned char));
-
-  cl_uint i;
-  for (i = 0; i < numDevices; i++) {
-    programBinaries[i] = calloc(programBinarySizes[i], sizeof(unsigned char));
-  }
-
-  // 4 - Get all of the program binaries
-  errNum = clGetProgramInfo(program, CL_PROGRAM_BINARIES,
-                            sizeof(unsigned char *) * numDevices,
-                            programBinaries, NULL);
-  if (errNum != CL_SUCCESS) {
-    fprintf(stderr, "<rtl> Error querying for program binaries.\n");
-    free(devices);
-    free(programBinarySizes);
-    for (i = 0; i < numDevices; i++) {
-      free(programBinaries[i]);
-    }
-    free(programBinaries);
-    return 0;
-  }
-
-  // 5 - Finally store the binaries for the device requested
-  // out to disk for future reading.
-  for (i = 0; i < numDevices; i++) {
-    // Store the binary just for the device requested.
-    if (devices[i] == device) {
-      FILE *fp = fopen(fileName, "wb");
-      fwrite(programBinaries[i], 1, programBinarySizes[i], fp);
-      fclose(fp);
-      break;
-    }
-  }
-
-  // Cleanup
-  free(devices);
-  free(programBinarySizes);
-  for (i = 0; i < numDevices; i++) {
-    free(programBinaries[i]);
-  }
-  free(programBinaries);
-  return 1;
-}
-
 /// Class containing all the device information.
 class RTLDeviceInfoTy {
 
@@ -678,9 +529,7 @@ public:
 
   ~RTLDeviceInfoTy() {}
 
-  ///
-  /// Profile
-  ///
+  // Profile
   void _cl_profile(const char *str, int32_t device_id) {
     cl_ulong time_start;
     cl_ulong time_end;
@@ -724,10 +573,19 @@ public:
   extern "C" {
 #endif
 
+  // Return an integer different from zero if the provided device image can be
+  // supported by the runtime. The functionality is similar to comparing the
+  // result of __tgt__rtl__load__binary to NULL. However, this is meant to be a
+  // lightweight query to determine if the RTL is suitable for an image without
+  // having to load the library, which can be expensive.
   int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) { return true; }
 
+  // Return the number of available devices of the type supported by the
+  // target RTL.
   int32_t __tgt_rtl_number_of_devices() { return DeviceInfo._ndevices; }
 
+  // Initialize the specified device. In case of success return 0; otherwise
+  // return an error code.
   int32_t __tgt_rtl_init_device(int32_t device_id) {
     cl_int _status;
 
@@ -784,6 +642,11 @@ public:
     return OFFLOAD_FAIL;
   }
 
+  // Pass an executable image section described by image to the specified
+  // device and prepare an address table of target entities. In case of error,
+  // return NULL. Otherwise, return a pointer to the built address table.
+  // Individual entries in the table may also be NULL, when the corresponding
+  // offload region is not supported on the target device.
   __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
                                             __tgt_device_image *image) {
 
@@ -859,6 +722,16 @@ public:
     return &table;
   }
 
+  // Allocate data on the particular target device, of the specified size.
+  // HostPtr is a address of the host data the allocated target data
+  // will be associated with (HostPtr may be NULL if it is not known at
+  // allocation time, like for example it would be for target data that
+  // is allocated by omp_target_alloc() API). Return address of the
+  // allocated data on the target that will be used by libomptarget.so to
+  // initialize the target data mapping structures. These addresses are
+  // used to generate a table of target variables to pass to
+  // __tgt_rtl_run_region(). The __tgt_rtl_data_alloc() returns NULL in
+  // case an error occurred on the target device.
   void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr) {
     cl_int status = 0;
     cl_mem mem = clCreateBuffer(DeviceInfo._context[device_id],
@@ -872,6 +745,8 @@ public:
     return mem;
   }
 
+  // Pass the data content to the target device using the target address.
+  // In case of success, return zero. Otherwise, return an error code.
   int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                                 int64_t size) {
     cl_int status = clEnqueueWriteBuffer(
@@ -895,6 +770,8 @@ public:
     return OFFLOAD_SUCCESS;
   }
 
+  // Retrieve the data content from the target device using its address.
+  // In case of success, return zero. Otherwise, return an error code.
   int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr,
                                   void *tgt_ptr, int64_t size) {
     cl_int status =
@@ -917,6 +794,8 @@ public:
     return OFFLOAD_SUCCESS;
   }
 
+  // De-allocate the data referenced by target ptr on the device. In case of
+  // success, return zero. Otherwise, return an error code.
   int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
     if (cl_int status = clReleaseMemObject((cl_mem)tgt_ptr) != CL_SUCCESS) {
       fprintf(stderr, "<rtl> Failed releasing buffer %d.\n", device_id);
@@ -926,6 +805,11 @@ public:
     return OFFLOAD_SUCCESS;
   }
 
+  // Transfer control to the offloaded entry Entry on the target device.
+  // Args and Offsets are arrays of NumArgs size of target addresses and
+  // offsets. An offset should be added to the target address before passing it
+  // to the outlined function on device side. In case of success, return zero.
+  // Otherwise, return an error code.
   int32_t __tgt_rtl_run_target_team_region(int32_t device_id,
                                            void *tgt_entry_ptr, void **tgt_args,
                                            ptrdiff_t *tgt_offsets,
@@ -963,6 +847,7 @@ public:
 
     // teams use (for now) only one dimmension
     cl_uint wd = 1;
+    
     // calculate number of threads in each team:
     size_t *global_size;
     size_t *local_size;
@@ -1035,6 +920,8 @@ public:
     }
   }
 
+  // Similar to __tgt_rtl_run_target_region, but additionally specify the
+  // number of teams to be created and a number of threads in each team.
   int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
                                       void **tgt_args, ptrdiff_t *tgt_offsets,
                                       int32_t arg_num) {
