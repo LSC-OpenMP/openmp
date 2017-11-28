@@ -17,13 +17,10 @@
 #include <deque>
 #include <unistd.h>
 
+#include "opae_svc_wrapper.h"
+
 #define AFU_UUID "C000C966-0D82-4272-9AEF-FE5F84570612"
 
-#define CACHELINE_BYTES 64
-#define CL(x) ((x) * CACHELINE_BYTES)
-#define MB(x) ((x) * 1024 * 1024)
-
-#define DSM_SIZE                 MB(4)
 #define DSM_STATUS_COMPLETE      0x40
 
 #define CTL_ASSERT_RST           0
@@ -38,16 +35,15 @@
 #define CSR_BASE_BUFFER          0x0120
 
 struct Buffer {
-  size_t     size;   /// workspace size in bytes.
-  void*      m_virt; /// workspace virtual address.
-  uint64_t   m_phys; /// workspace physical address.
-  uint64_t   wsid;
+  uint64_t size;
+  uint64_t phys;
+  volatile uint64_t* virt;
 };
 
 class OPAEGenericApp{
 private:
   Buffer dsm;
-  fpga_handle handle;
+  OPAE_SVC_WRAPPER* fpga;
   std::deque<Buffer> buffers;
 
 public:
