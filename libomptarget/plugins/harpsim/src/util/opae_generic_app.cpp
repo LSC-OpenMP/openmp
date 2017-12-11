@@ -35,7 +35,7 @@ void* OPAEGenericApp::alloc_buffer(uint64_t size) {
   uint64_t ioAddress;
 
   buffer.size = size;
-  buffer.virt = (volatile uint64_t*)fpga->allocBuffer(size, &ioAddress);
+  buffer.virt = (volatile uint64_t*) fpga->allocBuffer(size, &ioAddress);
   buffer.phys = ioAddress;
 
   buffers.push_front(buffer);
@@ -80,7 +80,7 @@ int OPAEGenericApp::run() {
 
   // Initiate DSM Reset
   // Set DSM base, high then low
-  fpga->mmioWrite64(CSR_AFU_DSM_BASEL, dsm.phys/CL(1));
+  fpga->mmioWrite64(CSR_AFU_DSM_BASEL, intptr_t(dsm.virt));
 
   // Assert AFU reset
   fpga->mmioWrite64(CSR_CTL, CTL_ASSERT_RST);
@@ -91,7 +91,7 @@ int OPAEGenericApp::run() {
   for (int i = 0; i < buffers.size(); i++) {
     int pos = buffers.size() - i - 1;
 
-    fpga->mmioWrite64(CSR_BASE_BUFFER + 0x10*i, buffers[pos].phys/CL(1));
+    fpga->mmioWrite64(CSR_BASE_BUFFER + 0x10*i, intptr_t(buffers[pos].virt));
     fpga->mmioWrite64(CSR_BASE_BUFFER + 0x10*i + 0x08, buffers[pos].size/CL(1));
   }
 

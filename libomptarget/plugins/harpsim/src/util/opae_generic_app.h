@@ -21,8 +21,6 @@
 
 #define AFU_UUID "C000C966-0D82-4272-9AEF-FE5F84570612"
 
-#define DSM_STATUS_COMPLETE      0x40
-
 #define CTL_ASSERT_RST           0
 #define CTL_DEASSERT_RST         1
 #define CTL_START                3
