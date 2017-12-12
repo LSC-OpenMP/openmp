@@ -33,6 +33,7 @@ if(LIBOMPTARGET_DEP_BOOST_FOUND)
   include_directories(${LIBOMPTARGET_DEP_BOOST_INCLUDE_DIRS})
 
   add_library(omptarget.rtl.harp SHARED
+              src/util/opae_svc_wrapper.cpp
               src/util/opae_generic_app.cpp
               src/rtl.cpp)
 
