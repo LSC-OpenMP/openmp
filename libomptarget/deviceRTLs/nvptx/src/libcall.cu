@@ -13,8 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "omptarget-nvptx.h"
-NOINLINE void PrintTaskDescr(omptarget_nvptx_TaskDescr *taskDescr, char *title,
-    int level);
+
 #define TICK ((double) 1.0 / 745000000.0)
 
 EXTERN double omp_get_wtick(void) {
@@ -54,7 +53,7 @@ EXTERN int omp_get_max_threads(void) {
     rc = GetNumberOfProcsInTeam();
     ASSERT0(LT_FUSSY, rc >= 0, "bad number of threads");
   }
-  PRINT(LD_IO, "call omp_get_num_threads() return %\n", rc);
+  PRINT(LD_IO, "call omp_get_max_threads() return %\n", rc);
   return rc;
 }
 

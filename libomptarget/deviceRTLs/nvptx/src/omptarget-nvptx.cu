@@ -49,6 +49,13 @@ INLINE unsigned n_sm() {
   return n_sm;
 }
 
+EXTERN void __kmpc_kernel_init_params(void *Ptr) {
+  PRINT(LD_IO, "call to __kmpc_kernel_init_params with version %f\n",
+        OMPTARGET_NVPTX_VERSION);
+
+  SetTeamsReductionScratchpadPtr(Ptr);
+}
+
 EXTERN void __kmpc_kernel_init(int ThreadLimit,
                                int16_t RequiresOMPRuntime) {
   PRINT(LD_IO, "call to __kmpc_kernel_init with version %f\n",
@@ -69,6 +76,9 @@ EXTERN void __kmpc_kernel_init(int ThreadLimit,
   // Get a state object from the queue.
   int slot = smid() % MAX_SM;
   omptarget_nvptx_threadPrivateContext = omptarget_nvptx_device_State[slot].Dequeue();
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
+  omptarget_nvptx_threadPrivateContext->SetSourceQueue(slot);
+#endif
 
   // init thread private
   int threadId = GetLogicalThreadIdInBlock();
@@ -95,7 +105,11 @@ EXTERN void __kmpc_kernel_init(int ThreadLimit,
 EXTERN void __kmpc_kernel_deinit(int16_t IsOMPRuntimeInitialized) {
   if (IsOMPRuntimeInitialized) {
     // Enqueue omp state object for use by another team.
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700
+    int slot = omptarget_nvptx_threadPrivateContext->GetSourceQueue();
+#else
     int slot = smid() % MAX_SM;
+#endif
     omptarget_nvptx_device_State[slot].Enqueue(omptarget_nvptx_threadPrivateContext);
   }
   // Done with work.  Kill the workers.
@@ -145,6 +159,7 @@ EXTERN void __kmpc_spmd_kernel_init(int ThreadLimit,
   ASSERT0(LT_FUSSY, newTaskDescr, "expected a task descr");
   newTaskDescr->InitLevelOneTaskDescr(
     ThreadLimit, currTeamDescr.LevelZeroTaskDescr());
+  newTaskDescr->ThreadLimit() = ThreadLimit;
   // install new top descriptor
   omptarget_nvptx_threadPrivateContext->SetTopLevelTaskDescr(threadId,
                                                              newTaskDescr);

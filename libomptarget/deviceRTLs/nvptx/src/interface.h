@@ -134,6 +134,32 @@ typedef enum kmp_sched_t {
   kmp_sched_ordered_last = kmp_sched_auto_ordered,
   kmp_sched_distribute_first = kmp_sched_distr_static_chunk,
   kmp_sched_distribute_last = kmp_sched_distr_static_chunk_sched_static_chunkone,
+
+  /* Support for OpenMP 4.5 monotonic and nonmonotonic schedule modifiers.
+   * Since we need to distinguish the three possible cases (no modifier,
+   * monotonic modifier, nonmonotonic modifier), we need separate bits for
+   * each modifier. The absence of monotonic does not imply nonmonotonic,
+   * especially since 4.5 says that the behaviour of the "no modifier" case
+   * is implementation defined in 4.5, but will become "nonmonotonic" in 5.0.
+   *
+   * Since we're passing a full 32 bit value, we can use a couple of high
+   * bits for these flags; out of paranoia we avoid the sign bit.
+   *
+   * These modifiers can be or-ed into non-static schedules by the compiler
+   * to pass the additional information. They will be stripped early in the
+   * processing in __kmp_dispatch_init when setting up schedules, so
+   * most of the code won't ever see schedules with these bits set.
+   */
+  kmp_sched_modifier_monotonic = (1<<29),
+                /**< Set if the monotonic schedule modifier was present */
+  kmp_sched_modifier_nonmonotonic = (1<<30),
+                /**< Set if the nonmonotonic schedule modifier was present */
+
+# define SCHEDULE_WITHOUT_MODIFIERS(s) (enum kmp_sched_t)((s) & ~ (kmp_sched_modifier_nonmonotonic | kmp_sched_modifier_monotonic))
+# define SCHEDULE_HAS_MONOTONIC(s) (((s) & kmp_sched_modifier_monotonic)    != 0)
+# define SCHEDULE_HAS_NONMONOTONIC(s) (((s) & kmp_sched_modifier_nonmonotonic) != 0)
+# define SCHEDULE_HAS_NO_MODIFIERS(s) (((s) & (kmp_sched_modifier_nonmonotonic | kmp_sched_modifier_monotonic)) == 0)
+
 } kmp_sched_t;
 
 // parallel defs
@@ -329,6 +355,10 @@ EXTERN void __kmpc_dispatch_fini_4(kmp_Indent *loc, int32_t global_tid);
 EXTERN void __kmpc_dispatch_fini_4u(kmp_Indent *loc, int32_t global_tid);
 EXTERN void __kmpc_dispatch_fini_8(kmp_Indent *loc, int32_t global_tid);
 EXTERN void __kmpc_dispatch_fini_8u(kmp_Indent *loc, int32_t global_tid);
+
+// Support for reducing conditional lastprivate variables
+EXTERN void __kmpc_reduce_conditional_lastprivate(kmp_Indent *loc,
+  int32_t global_tid, int32_t varNum, void *array);
 
 // reduction
 EXTERN int32_t __kmpc_reduce41(kmp_Indent *loc, int32_t global_tid,
@@ -1250,6 +1280,7 @@ EXTERN void __array_atomic_float8_max(kmp_Indent *id_ref, int32_t tid,
                                       double *lhs, double *rhs, int64_t n);
 
 // non standard
+EXTERN void __kmpc_kernel_init_params(void *ReductionScratchpadPtr);
 EXTERN void __kmpc_kernel_init(int ThreadLimit, int16_t RequiresOMPRuntime);
 EXTERN void __kmpc_kernel_deinit(int16_t IsOMPRuntimeInitialized);
 EXTERN void __kmpc_spmd_kernel_init(int ThreadLimit,
@@ -1259,9 +1290,9 @@ EXTERN void __kmpc_spmd_kernel_deinit();
 EXTERN void __kmpc_kernel_prepare_parallel(void *WorkFn, int16_t IsOMPRuntimeInitialized);
 EXTERN bool __kmpc_kernel_parallel(void **WorkFn, int16_t IsOMPRuntimeInitialized);
 EXTERN void __kmpc_kernel_end_parallel();
-EXTERN bool __kmpc_kernel_convergent_parallel(void *buffer, bool *IsFinal, int32_t *LaneSource);
+EXTERN bool __kmpc_kernel_convergent_parallel(void *buffer, uint32_t Mask, bool *IsFinal, int32_t *LaneSource);
 EXTERN void __kmpc_kernel_end_convergent_parallel(void *buffer);
-EXTERN bool __kmpc_kernel_convergent_simd(void *buffer, bool *IsFinal, int32_t *LaneSource,
+EXTERN bool __kmpc_kernel_convergent_simd(void *buffer, uint32_t Mask, bool *IsFinal, int32_t *LaneSource,
                                           int32_t *LaneId, int32_t *NumLanes);
 EXTERN void __kmpc_kernel_end_convergent_simd(void *buffer);
 

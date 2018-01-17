@@ -11,3 +11,8 @@ if (NOT WIN32)
   add_subdirectory(libomptarget)
 endif()
 
+option(OPENMP_ENABLE_LIBOMPTARGET "Enable building libomptarget for offloading."
+       ${ENABLE_LIBOMPTARGET})
+if (OPENMP_ENABLE_LIBOMPTARGET)
+  add_subdirectory(libomptarget)
+endif()
