@@ -48,7 +48,8 @@ enum StaticDeviceId {
   SMARTNIC = 9001,
   HARP2    = 9002,
   CLOUD    = 9003,
-  OPENCL   = 9004
+  MPI      = 9004,
+  OPENCL   = 9005
 };
 
 // List of all plugins that can support offloading.
@@ -348,7 +349,6 @@ void RTLsTy::LoadRTLs() {
 
     if (strcmp(Name, "libomptarget.rtl.smartnic.so") == 0) {
       R.staticDeviceId = SMARTNIC;
-      printf("smartnic device id | id = %d\n", R.staticDeviceId);
     } else if (strcmp(Name, "libomptarget.rtl.harp.so") == 0) {
       R.staticDeviceId = HARP2;
     }
@@ -407,8 +407,8 @@ void RTLsTy::LoadRTLs() {
 }
 
 /// catch static device id.
-inline int translate_device_id(int device) {
-  for (int i = 0; (device > 9000) & (i < Devices.size()); i++) {
+inline int64_t translate_device_id(int64_t device) {
+  for (int64_t i = 0; (device > 9000) & (i < Devices.size()); i++) {
     if (Devices[i].RTL->staticDeviceId == device) {
       return i;
     }
@@ -1817,7 +1817,7 @@ EXTERN void __tgt_target_data_update(int64_t device_id, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types) {
   device_id = translate_device_id(device_id);
 
-  DP("Entering data update with %d mappings\n", arg_num);
+  DP("Entering data update for device %" PRId64 " with %d mappings\n", device_id, arg_num);
   // No devices available?
   if (device_id == OFFLOAD_DEVICE_DEFAULT) {
     device_id = omp_get_default_device();
@@ -2101,15 +2101,8 @@ EXTERN int __tgt_target(int64_t device_id, void *host_ptr, int32_t arg_num,
     void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types) {
   device_id = translate_device_id(device_id);
 
-  if (device_id == OFFLOAD_DEVICE_CONSTRUCTOR ||
-      device_id == OFFLOAD_DEVICE_DESTRUCTOR) {
-    // Return immediately for the time being, target calls with device_id
-    // -2 or -3 will be removed from the compiler in the future.
-    return OFFLOAD_SUCCESS;
-  }
-
-  DP("Entering target region with entry point " DPxMOD " and device Id %d\n",
-     DPxPTR(host_ptr), device_id);
+  DP("Entering target region with entry point " DPxMOD " and device Id %" PRId64
+     " with %d mappings\n", DPxPTR(host_ptr), device_id, arg_num);
   if (device_id == OFFLOAD_DEVICE_DEFAULT) {
     device_id = omp_get_default_device();
   }
@@ -2148,18 +2141,11 @@ EXTERN int __tgt_target_nowait(int64_t device_id, void *host_ptr,
 
 EXTERN int __tgt_target_teams(int64_t device_id, void *host_ptr,
     int32_t arg_num, void **args_base, void **args, int64_t *arg_sizes,
-    int32_t *arg_types, int32_t team_num, int32_t thread_limit) {
+    int64_t *arg_types, int32_t team_num, int32_t thread_limit) {
   device_id = translate_device_id(device_id);
 
-  if (device_id == OFFLOAD_DEVICE_CONSTRUCTOR ||
-      device_id == OFFLOAD_DEVICE_DESTRUCTOR) {
-    // Return immediately for the time being, target calls with device_id
-    // -2 or -3 will be removed from the compiler in the future.
-    return OFFLOAD_SUCCESS;
-  }
-
-  DP("Entering target region with entry point " DPxMOD " and device Id %d\n",
-     DPxPTR(host_ptr), device_id);
+  DP("Entering target region with entry point " DPxMOD " and device Id %" PRId64
+     " with %d mappings\n", DPxPTR(host_ptr), device_id, arg_num);
 
   if (device_id == OFFLOAD_DEVICE_DEFAULT) {
     device_id = omp_get_default_device();
