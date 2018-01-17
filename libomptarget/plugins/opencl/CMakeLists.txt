@@ -1,6 +1,6 @@
 if(LIBOMPTARGET_DEP_OPENCL_FOUND)
 
-  libomptarget_say("Building SPIR-V offloading plugin.")
+  libomptarget_say("Building Opencl/spir64 offloading plugin.")
 
   # Define the suffix for the runtime messaging dumps.
   add_definitions(-DTARGET_NAME=OPENCL)
@@ -23,9 +23,8 @@ if(LIBOMPTARGET_DEP_OPENCL_FOUND)
 
   # Report to the parent scope that we are building a plugin for opencl/spir.
   set(LIBOMPTARGET_SYSTEM_TARGETS "${LIBOMPTARGET_SYSTEM_TARGETS} opencl-unknown-unknown" PARENT_SCOPE)
-  set(LIBOMPTARGET_SYSTEM_TARGETS "${LIBOMPTARGET_SYSTEM_TARGETS}
-  spir64-unknown-unknown" PARENT_SCOPE)
+  set(LIBOMPTARGET_SYSTEM_TARGETS "${LIBOMPTARGET_SYSTEM_TARGETS} spir64-unknown-unknown" PARENT_SCOPE)
   
 else()
-  libomptarget_say("Not building opencl/spir offloading plugin: OpenCL 1.2+ not found in system.")
+  libomptarget_say("Not building opencl/spir offloading plugin: OpenCL 1.1+ not found in system.")
 endif()
