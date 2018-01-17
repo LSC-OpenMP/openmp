@@ -124,7 +124,7 @@ static inline int32_t check_devices(Elf *e,
 // Check whether an image is valid for execution on target_id
 static inline int32_t elf_check_machine(__tgt_device_image *image,
                                         uint16_t target_id,
-                                        uint16_t sub_target_id) {
+                                        uint16_t sub_target_id = 0) {
 
   // Is the library version incompatible with the header file?
   if (elf_version(EV_CURRENT) == EV_NONE) {
