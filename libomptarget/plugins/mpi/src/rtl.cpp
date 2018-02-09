@@ -71,6 +71,8 @@ class RTLDeviceInfoTy {
 
 public:
   std::list<DynLibTy> DynLibs;
+  MPI_Comm MPIDeviceCommWorld;
+  MPI_Info MPIDeviceStartInfo;
 
   // Record entry point associated with device.
   void createOffloadTable(int32_t device_id, __tgt_offload_entry *begin,
@@ -140,10 +142,30 @@ int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
 
 int32_t __tgt_rtl_number_of_devices() { return NUMBER_OF_DEVICES; }
 
-int32_t __tgt_rtl_init_device(int32_t device_id) { return OFFLOAD_SUCCESS; }
+int32_t __tgt_rtl_init_device(int32_t device_id) {
+  int is_mpi_initialized = 0;
+  MPI_Initialized(&is_mpi_initialized);
+  if (!is_mpi_initialized) {
+    MPI_Init(NULL, NULL);
+  }
+  int world_rank;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  printf("**** [MPI] Initing device %d\n", device_id);
+
+  return OFFLOAD_SUCCESS;
+}
 
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
                                           __tgt_device_image *image) {
+
+  MPI_Info_create(&DeviceInfo.MPIDeviceStartInfo);
+
+  MPI_Info_set(DeviceInfo.MPIDeviceStartInfo, "ompi_preload_binary", "true");
+  MPI_Info_set(DeviceInfo.MPIDeviceStartInfo, "ompi_preload_files_dest_dir", "/tmp/");
+
+  printf("**** [MPI] Spawning *****\n");
+  int spawnError[1];
+  MPI_Comm_spawn("./child", MPI_ARGV_NULL, 1, DeviceInfo.MPIDeviceStartInfo, 0, MPI_COMM_SELF, &DeviceInfo.MPIDeviceCommWorld, spawnError);
 
   DP("Dev %d: load binary from " DPxMOD " image\n", device_id,
      DPxPTR(image->ImageStart));
@@ -278,10 +300,8 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   int world_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-  if (world_rank == 0) { // host
-    printf("**** [MPI-%d] Host sending -> data size: %d\n", world_rank, (int)size);
-    MPI_Send(hst_ptr, size, MPI_BYTE, 1, 0, MPI_COMM_WORLD);
-  }
+  printf(">>>> [MPI] Host sending -> data size: %d bytes\n", (int)size);
+  MPI_Send(hst_ptr, size, MPI_BYTE, 0, 0, DeviceInfo.MPIDeviceCommWorld);
 
   return OFFLOAD_SUCCESS;
 }
@@ -292,10 +312,8 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
   int world_rank;
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-  if (world_rank == 0) { // host
-    printf("**** [MPI-%d] Host received -> data size: %d\n", world_rank, (int)size);
-    MPI_Recv(tgt_ptr, size, MPI_BYTE, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-  }
+  printf("<<<< [MPI] Host received -> data size: %d bytes\n", (int)size);
+  MPI_Recv(tgt_ptr, size, MPI_BYTE, 0, 0, DeviceInfo.MPIDeviceCommWorld, MPI_STATUS_IGNORE);
 
   return OFFLOAD_SUCCESS;
 }
@@ -336,6 +354,18 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   void (*entry)(void);
   *((void**) &entry) = tgt_entry_ptr;
   ffi_call(&cif, entry, NULL, &args[0]);
+  // send work
+  int work[4];
+  work[0] = 1; work[1] = 0; work[2] = 0; work[3] = 0;
+  MPI_Send(&work[0], 4, MPI_INT, 0, 0, DeviceInfo.MPIDeviceCommWorld);
+
+  work[0] = 1; work[1] = 1;
+  MPI_Send(&work[0], 4, MPI_INT, 0, 0, DeviceInfo.MPIDeviceCommWorld);
+
+  work[0] = 0;
+  MPI_Send(&work[0], 4, MPI_INT, 0, 0, DeviceInfo.MPIDeviceCommWorld);
+
+  MPI_Info_free(&DeviceInfo.MPIDeviceStartInfo);
   return OFFLOAD_SUCCESS;
 }
 
