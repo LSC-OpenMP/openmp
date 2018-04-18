@@ -23,36 +23,33 @@ __device__ static unsigned getThreadId() {
 }
 // Warp ID in the CUDA block
 __device__ static unsigned getWarpId() {
-  return threadIdx.x >> DS_Max_Worker_Warp_Size_Log2;
+  return threadIdx.x >> DS_Max_Worker_Warp_Size_Bits;
 }
-//// Team ID in the CUDA grid
-//__device__ static unsigned getTeamId() {
-//  return blockIdx.x;
-//}
+
 // The CUDA thread ID of the master thread.
 __device__ static unsigned getMasterThreadId() {
-  unsigned Mask = DS_Max_Worker_Warp_Size - 1;
+  unsigned Mask = WARPSIZE - 1;
   return (getNumThreads() - 1) & (~Mask);
 }
-// The lowest ID among the active threads in the warp.
-__device__ static unsigned getWarpMasterActiveThreadId() {
-  unsigned long long Mask = __BALLOT_SYNC(0xFFFFFFFF, true);
-  unsigned long long ShNum = 32 - (getThreadId() & DS_Max_Worker_Warp_Size_Log2_Mask);
+
+// Find the active threads in the warp - return a mask whose n-th bit is set if
+// the n-th thread in the warp is active.
+__device__ static unsigned getActiveThreadsMask() {
+  return __BALLOT_SYNC(0xFFFFFFFF, true);
+}
+
+// Return true if this is the first active thread in the warp.
+__device__ static bool IsWarpMasterActiveThread() {
+  unsigned long long Mask = getActiveThreadsMask();
+  unsigned long long ShNum = WARPSIZE - (getThreadId() % WARPSIZE);
   unsigned long long Sh = Mask << ShNum;
-  return __popc(Sh);
+  return (unsigned)Sh == 0;
 }
 // Return true if this is the master thread.
 __device__ static bool IsMasterThread() {
   return getMasterThreadId() == getThreadId();
 }
-// Return true if this is the first thread in the warp.
-//static bool IsWarpMasterThread() {
-//  return (getThreadId() & DS_Max_Worker_Warp_Size_Log2_Mask) == 0u;
-//}
-// Return true if this is the first active thread in the warp.
-__device__ static bool IsWarpMasterActiveThread() {
-  return getWarpMasterActiveThreadId() == 0u;
-}
+
 /// Return the provided size aligned to the size of a pointer.
 __device__ static size_t AlignVal(size_t Val) {
   const size_t Align = (size_t)sizeof(void*);
@@ -129,7 +126,7 @@ EXTERN void* __kmpc_data_sharing_environment_begin(
   DSPRINT(DSFLAG,"Default Data Size %016llx\n", SharingDefaultDataSize);
 
   unsigned WID = getWarpId();
-  unsigned CurActiveThreads = __BALLOT_SYNC(0xFFFFFFFF, true);
+  unsigned CurActiveThreads = getActiveThreadsMask();
 
   __kmpc_data_sharing_slot *&SlotP = DataSharingState.SlotPtr[WID];
   void *&StackP = DataSharingState.StackPtr[WID];
@@ -214,8 +211,12 @@ EXTERN void* __kmpc_data_sharing_environment_begin(
     }
   }
 
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700)
+  __syncwarp(CurActiveThreads);
+#else
   // FIXME: Need to see the impact of doing it here.
   __threadfence_block();
+#endif
 
   DSPRINT0(DSFLAG,"Exiting __kmpc_data_sharing_environment_begin\n");
 
@@ -252,7 +253,7 @@ EXTERN void __kmpc_data_sharing_environment_end(
     return;
   }
 
-  int32_t CurActive = __BALLOT_SYNC(0xFFFFFFFF, true);
+  int32_t CurActive = getActiveThreadsMask();
 
   // Only the warp master can restore the stack and frame information, and only if there are no other threads left behind in this environment (i.e. the warp diverged and returns in different places). This only works if we assume that threads will converge right after the call site that started the environment.
   if (IsWarpMasterActiveThread()) {
@@ -285,8 +286,12 @@ EXTERN void __kmpc_data_sharing_environment_end(
     }
   }
 
+#if (defined(__CUDA_ARCH__) && __CUDA_ARCH__ >= 700)
+  __syncwarp(CurActive);
+#else
   // FIXME: Need to see the impact of doing it here.
   __threadfence_block();
+#endif
 
   DSPRINT0(DSFLAG,"Exiting __kmpc_data_sharing_environment_end\n");
   return;
@@ -303,7 +308,7 @@ EXTERN void* __kmpc_get_data_sharing_environment_frame(int32_t SourceThreadID,
 
   // Get the frame used by the requested thread.
 
-  unsigned SourceWID = SourceThreadID >> DS_Max_Worker_Warp_Size_Log2;
+  unsigned SourceWID = SourceThreadID >> DS_Max_Worker_Warp_Size_Bits;
 
   DSPRINT(DSFLAG,"Source  warp: %d\n", SourceWID);
 
@@ -311,8 +316,3 @@ EXTERN void* __kmpc_get_data_sharing_environment_frame(int32_t SourceThreadID,
   DSPRINT0(DSFLAG,"Exiting __kmpc_get_data_sharing_environment_frame\n");
   return P;
 }
-
-//EXTERN void __kmpc_samuel_print(int64_t Bla){
-//  DSPRINT(DSFLAG,"Sam print: %016llx\n",Bla);
-//
-//}

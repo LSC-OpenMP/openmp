@@ -28,6 +28,7 @@
 #include "counter_group.h"
 #include "debug.h" // debug
 #include "interface.h" // interfaces with omp, compiler, and user
+#include "state-queue.h"
 #include "support.h"
 
 #define OMPTARGET_NVPTX_VERSION 1.1
@@ -66,14 +67,11 @@ enum DATA_SHARING_SIZES {
   DS_Max_Worker_Threads = 992,
   // The size reserved for data in a shared memory slot.
   DS_Slot_Size = 256,
-  // The maximum number of threads in a worker warp.
-  DS_Max_Worker_Warp_Size = 32,
   // The number of bits required to represent the maximum number of threads in a
   // warp.
-  DS_Max_Worker_Warp_Size_Log2 = 5,
-  DS_Max_Worker_Warp_Size_Log2_Mask = (~0u >> (32-DS_Max_Worker_Warp_Size_Log2)),
+  DS_Max_Worker_Warp_Size_Bits = 5,
   // The slot size that should be reserved for a working warp.
-  DS_Worker_Warp_Slot_Size = DS_Max_Worker_Warp_Size * DS_Slot_Size,
+  DS_Worker_Warp_Slot_Size = WARPSIZE * DS_Slot_Size,
   // The maximum number of warps in use
   DS_Max_Warp_Number = 32,
 };
@@ -216,7 +214,7 @@ public:
 
   INLINE __kmpc_data_sharing_slot *RootS(int wid) {
     // If this is invoked by the master thread of the master warp then intialize it with a smaller slot.
-    if (wid == DS_Max_Worker_Warp_Size - 1){
+    if (wid == WARPSIZE - 1){
       // Initialize the pointer to the end of the slot given the size of the data section. DataEnd is non-inclusive.
       master_rootS[0].DataEnd = &master_rootS[0].Data[0] + DS_Slot_Size;
       // We currently do not have a next slot.
@@ -238,7 +236,7 @@ private:
   omp_lock_t criticalLock;
   uint64_t lastprivateIterBuffer;
 
-  __align__(16) __kmpc_data_sharing_worker_slot_static worker_rootS[DS_Max_Worker_Warp_Size - 1];
+  __align__(16) __kmpc_data_sharing_worker_slot_static worker_rootS[WARPSIZE - 1];
   __align__(16) __kmpc_data_sharing_master_slot_static master_rootS[1];
 };
 

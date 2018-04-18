@@ -24,7 +24,7 @@ endif()
 
 # We can't use clang as nvcc host preprocessor, so we attempt to replace it with
 # gcc.
-if(CUDA_HOST_COMPILER MATCHES "(clang)|(.*/clang)$")
+if(CUDA_HOST_COMPILER MATCHES clang)
 
   find_program(LIBOMPTARGET_NVPTX_ALTERNATE_GCC_HOST_COMPILER NAMES gcc)
 
@@ -33,7 +33,7 @@ if(CUDA_HOST_COMPILER MATCHES "(clang)|(.*/clang)$")
     libomptarget_say("Please include gcc in your path or set LIBOMPTARGET_NVPTX_ALTERNATE_HOST_COMPILER to the full path of of valid compiler.")
     return()
   endif()
-  set(CUDA_HOST_COMPILER "${LIBOMPTARGET_NVPTX_ALTERNATE_GCC_HOST_COMPILER}")
+  set(CUDA_HOST_COMPILER "${LIBOMPTARGET_NVPTX_ALTERNATE_GCC_HOST_COMPILER}" CACHE FILEPATH "" FORCE)
 endif()
 
 if(LIBOMPTARGET_DEP_CUDA_FOUND)
@@ -47,13 +47,11 @@ if(LIBOMPTARGET_DEP_CUDA_FOUND)
       src/cancel.cu
       src/critical.cu
       src/data_sharing.cu
-      src/debug.cu
       src/libcall.cu
       src/loop.cu
       src/omptarget-nvptx.cu
       src/parallel.cu
       src/reduction.cu
-      src/stdio.cu
       src/sync.cu
       src/task.cu
   )
@@ -61,6 +59,7 @@ if(LIBOMPTARGET_DEP_CUDA_FOUND)
   set(omp_data_objects src/omp_data.cu)
 
   # Get all the compute capabilities the user requested or use SM_35 by default.
+  # SM_35 is what clang uses by default.
   if(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITY)
     string(REPLACE "," ";" nvptx_sm_list ${LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITY})
     foreach(sm ${nvptx_sm_list})
@@ -71,7 +70,9 @@ if(LIBOMPTARGET_DEP_CUDA_FOUND)
   endif()
 
   # Activate RTL message dumps if requested by the user.
-  if(LIBOMPTARGET_NVPTX_DEBUG)
+  set(LIBOMPTARGET_NVPTX_DEBUG FALSE CACHE BOOL
+    "Activate NVPTX device RTL debug messages.")
+  if(${LIBOMPTARGET_NVPTX_DEBUG})
     set(CUDA_DEBUG -DOMPTARGET_NVPTX_DEBUG=-1 -g --ptxas-options=-v)
   endif()
 
@@ -97,13 +98,13 @@ if(LIBOMPTARGET_DEP_CUDA_FOUND)
     # Find a clang compiler capable of compiling cuda files to LLVM bitcode and
     # an llvm linker.
     # We use the one provided for the user, attempt to use the
-    # clang in the tree, attempt to use clang in the PATH, or just fail.
+	# clang in the tree, attempt to use clang in the PATH, or just fail.
 
     set(LIBOMPTARGET_NVPTX_CUDA_COMPILER "" CACHE STRING
       "Location of a CUDA compiler capable of emitting LLVM bitcode.")
     set(LIBOMPTARGET_NVPTX_BC_LINKER "" CACHE STRING
-    "Location of a linker capable of linking LLVM bitcode objects.")
-
+      "Location of a linker capable of linking LLVM bitcode objects.")
+      
     # Trace we require something from the tree.
     set(LIBOMPTARGET_NVPTX_SELECTED_CUDA_COMPILER_FROM_TREE "")
     set(LIBOMPTARGET_NVPTX_SELECTED_BC_LINKER_FROM_TREE "")
@@ -120,7 +121,7 @@ if(LIBOMPTARGET_DEP_CUDA_FOUND)
       set(LIBOMPTARGET_NVPTX_SELECTED_CUDA_COMPILER_FROM_TREE clang)
     else()
       find_program(LIBOMPTARGET_NVPTX_SELECTED_CUDA_COMPILER clang++)
-    endif()
+	endif()
 
     if (NOT LIBOMPTARGET_NVPTX_BC_LINKER STREQUAL "")
       set(LIBOMPTARGET_NVPTX_SELECTED_BC_LINKER ${LIBOMPTARGET_NVPTX_BC_LINKER})
@@ -143,19 +144,18 @@ if(LIBOMPTARGET_DEP_CUDA_FOUND)
     if(NOT LIBOMPTARGET_NVPTX_SELECTED_BC_LINKER)
       libomptarget_say("Cannot find a linker capable of linking LLVM bitcode objects.")
       libomptarget_say("Please configure with flag -DLIBOMPTARGET_NVPTX_BC_LINKER")
-    endif()
+	endif()
+
 
     if(LIBOMPTARGET_NVPTX_SELECTED_CUDA_COMPILER AND LIBOMPTARGET_NVPTX_SELECTED_BC_LINKER)
       libomptarget_say("Building CUDA LLVM bitcode offloading device RTL.")
 
-      # Decide which ptx version to use. We use 5.0 for CUDA 8 or 4.2 for older versions
-      if(CUDA_VERSION_MAJOR LESS 8)
-	set(CUDA_PTX_VERSION ptx42)
-      elseif(CUDA_VERSION_MAJOR LESS 9)
-	set(CUDA_PTX_VERSION ptx50)
-      else()
+      # Decide which ptx version to use. Same choices as Clang.
+      if(CUDA_VERSION_MAJOR GREATER 9 OR CUDA_VERSION_MAJOR EQUAL 9)
         set(CUDA_PTX_VERSION ptx60)
-      endif()     
+      else()
+        set(CUDA_PTX_VERSION ptx42)
+      endif()
  
       # Set flags for Clang cuda compilation.  Only Clang is supported because there is
       # no other compiler capable of generating bitcode from cuda sources.
@@ -174,9 +174,6 @@ if(LIBOMPTARGET_DEP_CUDA_FOUND)
       if(CUDA_VERSION_MAJOR EQUAL 9)
         set(CUDA_FLAGS ${CUDA_FLAGS} -Dnv_weak=weak)
       endif()
-
-      # This is currently broken
-      set(CUDA_INCLUDES -I/usr/include/powerpc64le-linux-gnu)
 
       # Get all the compute capabilities the user requested or use SM_35 by default.
       set(CUDA_ARCH "")
