@@ -13,6 +13,7 @@
 
 #include <uuid/uuid.h>
 #include <opae/fpga.h>
+#include <string>
 #include <cstring>
 #include <deque>
 #include <unistd.h>
