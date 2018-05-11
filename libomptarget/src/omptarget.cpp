@@ -48,7 +48,10 @@ enum StaticDeviceId {
   SMARTNIC = 9001,
   HARP2    = 9002,
   CLOUD    = 9003,
-  HARP2SIM = 9004
+  MPI      = 9004,
+  OPENCL   = 9005,
+  HARP2SIM = 9006,
+  AWSF1    = 9007
 };
 
 // List of all plugins that can support offloading.
@@ -59,7 +62,8 @@ static const char *RTLNames[] = {
     /* AArch64 target       */ "libomptarget.rtl.aarch64.so",
     /* SmartNIC target      */ "libomptarget.rtl.smartnic.so",
     /* Intel HARP target    */ "libomptarget.rtl.harp.so",
-    /* Intel HARPSIM target */ "libomptarget.rtl.harpsim.so"};
+    /* Intel HARPSIM target */ "libomptarget.rtl.harpsim.so",
+    /* AWS EC2 F1 target    */ "libomptarget.rtl.awsf1.so"};
 
 // forward declarations
 struct RTLInfoTy;
@@ -355,6 +359,8 @@ void RTLsTy::LoadRTLs() {
       R.staticDeviceId = HARP2;
     } else if (strcmp(Name, "libomptarget.rtl.harpsim.so") == 0) {
       R.staticDeviceId = HARP2SIM;
+    } else if (strcmp(Name, "libomptarget.rtl.awsf1.so") == 0) {
+      R.staticDeviceId = AWSF1;
     }
 
 #ifdef OMPTARGET_DEBUG
@@ -394,7 +400,8 @@ void RTLsTy::LoadRTLs() {
 
     if (R.staticDeviceId == SMARTNIC |
         R.staticDeviceId == HARP2 |
-        R.staticDeviceId == HARP2SIM) {
+        R.staticDeviceId == HARP2SIM |
+        R.staticDeviceId == AWSF1) {
       if (!(*((void**) &R.set_module) = dlsym(
                 dynlib_handle, "__tgt_rtl_set_module")))
         continue;
@@ -1985,7 +1992,8 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
   // program the device if is an FPGA
   if (Device.RTL->staticDeviceId == SMARTNIC ||
     Device.RTL->staticDeviceId == HARP2 ||
-    Device.RTL->staticDeviceId == HARP2SIM) {
+    Device.RTL->staticDeviceId == HARP2SIM ||
+    Device.RTL->staticDeviceId == AWSF1) {
 
     Device.RTL->set_module(TargetTable->EntriesBegin[TM->Index].module);
   }

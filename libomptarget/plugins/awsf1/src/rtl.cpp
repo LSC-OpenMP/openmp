@@ -1,4 +1,4 @@
-//===----RTLs/harp/src/rtl.cpp - Target RTLs Implementation ------- C++ -*-===//
+//===----RTLs/awsf1/src/rtl.cpp - Target RTLs Implementation ------ C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// RTL for HARP machine
+// RTL for AWSF1 machine
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,13 +22,14 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 
-#include "util/opae_generic_app.h"
+#include "util/awsf1_generic_app.h"
 
 #include "omptarget.h"
 
 #ifndef TARGET_NAME
-#define TARGET_NAME HARP
+#define TARGET_NAME AWSF1
 #endif
 
 #define GETNAME2(name) #name
@@ -40,22 +41,22 @@
 #define NUMBER_OF_DEVICES 1
 #define OFFLOADSECTIONNAME ".omp_offloading.entries"
 
-// Utility for retrieving and printing HARP error string.
-#ifdef HARP_ERROR_REPORT
-#define HARP_ERR_STRING(err)                                               \
+// Utility for retrieving and printing AWSF1 error string.
+#ifdef AWSF1_ERROR_REPORT
+#define AWSF1_ERR_STRING(err)                                              \
   do {                                                                     \
     const char *errStr;                                                    \
     cuGetErrorString(err, &errStr);                                        \
-    DP("HARP error is: %s\n", errStr);                                     \
+    DP("AWSF1 error is: %s\n", errStr);                                    \
   } while (0)
 #else
-#define HARP_ERR_STRING(err)                                               \
+#define AWSF1_ERR_STRING(err)                                              \
   {}
 #endif
 
 #ifdef OMPTARGET_DEBUG
   #define TIME_START     t_start = rtclock();
-  #define TIME_PRINT(x)  t_end = rtclock(); printf("[time][harpsim] %s = %0.6lfs\n", x, t_end - t_start);
+  #define TIME_PRINT(x)  t_end = rtclock(); printf("[time][awsf1] %s = %0.6lfs\n", x, t_end - t_start);
   double rtclock() {
     struct timezone Tzp;
     struct timeval Tp;
@@ -139,7 +140,7 @@ public:
 };
 
 static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
-static OPAEGenericApp  opae_generic_app;
+static AWSF1GenericApp awsf1_generic_app;
 
 #ifdef __cplusplus
 extern "C" {
@@ -149,20 +150,22 @@ int32_t __tgt_rtl_set_module(void* module) {
 
   std::string module_str((char*) module);
 
-  DP("[harpsim] module = %s\n", module_str.c_str());
+  DP("[awsf1] module = %s\n", module_str.c_str());
 
   TIME_START
-  if (0 != opae_generic_app.program(module_str.c_str()))
+  if (0 != awsf1_generic_app.program(module_str.c_str()))
       return OFFLOAD_FAIL;
   TIME_PRINT("program")
+
+  DP("[awsf1] __tgt_rtl_set_module success\n");
 
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
-  uint32_t is_valid_binary = elf_check_machine(image, EM_X86_64, 9006);
+  uint32_t is_valid_binary = elf_check_machine(image, EM_X86_64, 9007);
 
-  DP("[harpsim] __tgt_rtl_is_valid_binary\n");
+  DP("[awsf1] __tgt_rtl_is_valid_binary\n");
 
   return is_valid_binary;
 }
@@ -173,7 +176,7 @@ int32_t __tgt_rtl_number_of_devices() {
 
 int32_t __tgt_rtl_init_device(int32_t device_id) {
 
-  DP("[harpsim] __tgt_rtl_init_device\n");
+  DP("[awsf1] __tgt_rtl_init_device\n");
 
   return OFFLOAD_SUCCESS;
 }
@@ -305,11 +308,16 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size) {
-  DP("[harpsim] __tgt_rtl_data_alloc\n");
+  DP("[awsf1] __tgt_rtl_data_alloc\n");
 
   TIME_START
-  void *ptr = opae_generic_app.alloc_buffer(size);
+  void *ptr = awsf1_generic_app.alloc_buffer(size);
   TIME_PRINT("alloc")
+
+  DP("[awsf1] size = %d\n", size);
+
+  if (ptr == NULL)
+    DP("[awsf1] ptr null\n");
 
   return ptr;
 }
@@ -317,7 +325,7 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size) {
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
     int64_t size) {
 
-  DP("[harpsim] __tgt_rtl_data_submit\n");
+  DP("[awsf1] __tgt_rtl_data_submit\n");
 
   TIME_START
   memcpy(tgt_ptr, hst_ptr, size);
@@ -329,7 +337,7 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
     int64_t size) {
 
-  DP("[harpsim] __tgt_rtl_data_retrieve\n");
+  DP("[awsf1] __tgt_rtl_data_retrieve\n");
 
   TIME_START
   memcpy(hst_ptr, tgt_ptr, size);
@@ -340,10 +348,10 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
 
-  DP("[harpsim] __tgt_rtl_delete\n");
+  DP("[awsf1] __tgt_rtl_delete\n");
 
   TIME_START
-  opae_generic_app.delete_buffer(tgt_ptr);
+  awsf1_generic_app.delete_buffer(tgt_ptr);
   TIME_PRINT("delete")
 
   return OFFLOAD_SUCCESS;
@@ -353,9 +361,9 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
     void **tgt_args, int32_t arg_num, int32_t team_num, int32_t thread_limit,
     uint64_t loop_tripcount) {
 
-  DP("[harpsim] __tgt_rtl_run_target_team_region\n");
+  DP("[awsf1] __tgt_rtl_run_target_team_region\n");
   TIME_START
-  opae_generic_app.run();
+  awsf1_generic_app.run();
   TIME_PRINT("run")
 
   return OFFLOAD_SUCCESS;
@@ -364,7 +372,7 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
     void **tgt_args, int32_t arg_num) {
 
-  DP("[harpsim] __tgt_rtl_run_target_region\n");
+  DP("[awsf1] __tgt_rtl_run_target_region\n");
 
   // use one team and one thread.
   return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
