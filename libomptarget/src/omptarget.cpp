@@ -1998,6 +1998,11 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
     Device.RTL->set_module(TargetTable->EntriesBegin[TM->Index].module);
   }
 
+  // has check feature
+  int has_check = 0;
+  if (1 == TargetTable->EntriesBegin[TM->Index].check)
+    has_check = 1;
+
   // Move data to device.
   int rc = target_data_begin(Device, arg_num, args_base, args, arg_sizes,
       arg_types);
@@ -2129,6 +2134,9 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
     rc = OFFLOAD_FAIL;
   }
 
+  if (rc != OFFLOAD_FAIL)
+    rc = rc | has_check;
+
   return rc;
 }
 
@@ -2246,3 +2254,15 @@ EXTERN void __kmpc_kernel_print(char *title) { DP(" %s\n", title); }
 EXTERN void __kmpc_kernel_print_int8(char *title, int64_t data) {
   DP(" %s val=%" PRId64 "\n", title, data);
 }
+
+// check feature
+
+EXTERN void
+__tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size) {
+  if (0 == memcmp(host_ptr, tgt_ptr, size)) {
+    printf("\n[HardCloud] check : PASS\n");
+  } else {
+    printf("\n[HardCloud] check : FAIL\n");
+  }
+}
+

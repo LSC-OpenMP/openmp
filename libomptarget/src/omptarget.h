@@ -19,7 +19,7 @@
 #include <stddef.h>
 
 #define OFFLOAD_SUCCESS (0)
-#define OFFLOAD_FAIL (~0)
+#define OFFLOAD_FAIL    (~0)
 
 #define OFFLOAD_DEVICE_DEFAULT     -1
 #define HOST_DEVICE                -10
@@ -72,6 +72,7 @@ struct __tgt_offload_entry {
   char *name;   // Name of the function or global
   char *module; // Name of module to offloading if is an FPGA.
   size_t size;  // Size of the entry info (0 if it is a function)
+  int32_t check; // Flags associated with the check feature.
   int32_t flags; // Flags associated with the entry, e.g. 'link'.
   int32_t reserved; // Reserved, to be used by the runtime library.
 };
@@ -189,6 +190,9 @@ int __tgt_target_teams_nowait(int64_t device_id, void *host_ptr,
                               int32_t depNum, void *depList,
                               int32_t noAliasDepNum, void *noAliasDepList);
 void __kmpc_push_target_tripcount(int64_t device_id, uint64_t loop_tripcount);
+
+// check feature: compare result between device and host.
+void __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size);
 
 #ifdef __cplusplus
 }
