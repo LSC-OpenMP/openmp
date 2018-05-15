@@ -2259,10 +2259,30 @@ EXTERN void __kmpc_kernel_print_int8(char *title, int64_t data) {
 
 EXTERN void
 __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size) {
-  if (0 == memcmp(host_ptr, tgt_ptr, size)) {
-    printf("\n[HardCloud] check : PASS\n");
+  void *dynlib_handle = dlopen("libomptarget.rtl.verification.so", RTLD_NOW);
+
+  if (dynlib_handle) {
+    // external check
+
+    void (*compare_variable)(void *, void *, size_t);
+
+    *(void**)(&compare_variable) = dlsym(dynlib_handle, "__rtl_compare_variable");
+
+    if (compare_variable)
+      compare_variable(host_ptr, tgt_ptr, size);
+    else
+      DP("function __rtl_compare_variable not exist in this RTL\n");
+
+    dlclose(dynlib_handle);
+
   } else {
-    printf("\n[HardCloud] check : FAIL\n");
+    // default check
+
+    if (0 == memcmp(host_ptr, tgt_ptr, size)) {
+      printf("\n[HardCloud] check : PASS\n");
+    } else {
+      printf("\n[HardCloud] check : FAIL\n");
+    }
   }
 }
 
