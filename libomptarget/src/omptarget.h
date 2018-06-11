@@ -105,8 +105,25 @@ extern "C" {
 #endif
 
 // Implemented in libomp, they are called from within __tgt_* functions.
+typedef int32_t kmp_int32;
+typedef void ident_t;
+typedef kmp_int32 (*kmp_routine_entry_t)(kmp_int32, void *);
+typedef union kmp_cmplrdata {
+  kmp_int32 priority;
+  kmp_routine_entry_t destructors;
+} kmp_cmplrdata_t;
+typedef struct kmp_task {
+  void *shareds;
+  kmp_routine_entry_t routine;
+  kmp_int32 part_id;
+  kmp_cmplrdata_t data1;
+  kmp_cmplrdata_t data2;
+} kmp_task_t;
 int omp_get_default_device(void) __attribute__((weak));
-int32_t __kmpc_omp_taskwait(void *loc_ref, int32_t gtid) __attribute__((weak));
+kmp_int32 __kmpc_omp_taskwait(ident_t *loc_ref, kmp_int32 gtid) __attribute__((weak));
+kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
+    kmp_int32 flags, size_t sizeof_kmp_task_t, size_t sizeof_shareds,
+    kmp_routine_entry_t task_entry) __attribute__((weak));
 
 int omp_get_num_devices(void);
 int omp_get_initial_device(void);
@@ -137,6 +154,15 @@ void __tgt_target_data_begin(int64_t device_id, int32_t arg_num,
                              int64_t *arg_types);
 void __tgt_target_data_begin_nowait(int64_t device_id, int32_t arg_num,
                                     void **args_base, void **args,
+                                    int64_t *arg_sizes, int64_t *arg_types);
+void __tgt_target_data_begin_depend(int64_t device_id, int32_t arg_num,
+                                    void **args_base, void **args,
+                                    int64_t *arg_sizes, int64_t *arg_types,
+                                    int32_t depNum, void *depList,
+                                    int32_t noAliasDepNum,
+                                    void *noAliasDepList);
+void __tgt_target_data_begin_nowait_depend(int64_t device_id, int32_t arg_num,
+                                    void **args_base, void **args,
                                     int64_t *arg_sizes, int64_t *arg_types,
                                     int32_t depNum, void *depList,
                                     int32_t noAliasDepNum,
@@ -149,6 +175,14 @@ void __tgt_target_data_end(int64_t device_id, int32_t arg_num, void **args_base,
                            void **args, int64_t *arg_sizes, int64_t *arg_types);
 void __tgt_target_data_end_nowait(int64_t device_id, int32_t arg_num,
                                   void **args_base, void **args,
+                                  int64_t *arg_sizes, int64_t *arg_types);
+void __tgt_target_data_end_depend(int64_t device_id, int32_t arg_num,
+                                  void **args_base, void **args,
+                                  int64_t *arg_sizes, int64_t *arg_types,
+                                  int32_t depNum, void *depList,
+                                  int32_t noAliasDepNum, void *noAliasDepList);
+void __tgt_target_data_end_nowait_depend(int64_t device_id, int32_t arg_num,
+                                  void **args_base, void **args,
                                   int64_t *arg_sizes, int64_t *arg_types,
                                   int32_t depNum, void *depList,
                                   int32_t noAliasDepNum, void *noAliasDepList);
@@ -158,6 +192,15 @@ void __tgt_target_data_update(int64_t device_id, int32_t arg_num,
                               void **args_base, void **args, int64_t *arg_sizes,
                               int64_t *arg_types);
 void __tgt_target_data_update_nowait(int64_t device_id, int32_t arg_num,
+                                     void **args_base, void **args,
+                                     int64_t *arg_sizes, int64_t *arg_types);
+void __tgt_target_data_update_depend(int64_t device_id, int32_t arg_num,
+                                     void **args_base, void **args,
+                                     int64_t *arg_sizes, int64_t *arg_types,
+                                     int32_t depNum, void *depList,
+                                     int32_t noAliasDepNum,
+                                     void *noAliasDepList);
+void __tgt_target_data_update_nowait_depend(int64_t device_id, int32_t arg_num,
                                      void **args_base, void **args,
                                      int64_t *arg_sizes, int64_t *arg_types,
                                      int32_t depNum, void *depList,
@@ -175,8 +218,7 @@ int __tgt_target(int64_t device_id, void *host_ptr, int32_t arg_num,
                  int64_t *arg_types);
 int __tgt_target_nowait(int64_t device_id, void *host_ptr, int32_t arg_num,
                         void **args_base, void **args, int64_t *arg_sizes,
-                        int64_t *arg_types, int32_t depNum, void *depList,
-                        int32_t noAliasDepNum, void *noAliasDepList);
+                        int64_t *arg_types);
 
 int __tgt_target_teams(int64_t device_id, void *host_ptr, int32_t arg_num,
                        void **args_base, void **args, int64_t *arg_sizes,
@@ -185,9 +227,7 @@ int __tgt_target_teams(int64_t device_id, void *host_ptr, int32_t arg_num,
 int __tgt_target_teams_nowait(int64_t device_id, void *host_ptr,
                               int32_t arg_num, void **args_base, void **args,
                               int64_t *arg_sizes, int64_t *arg_types,
-                              int32_t num_teams, int32_t thread_limit,
-                              int32_t depNum, void *depList,
-                              int32_t noAliasDepNum, void *noAliasDepList);
+                              int32_t num_teams, int32_t thread_limit);
 void __kmpc_push_target_tripcount(int64_t device_id, uint64_t loop_tripcount);
 
 #ifdef __cplusplus

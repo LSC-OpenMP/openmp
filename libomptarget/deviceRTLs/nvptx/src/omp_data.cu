@@ -1,4 +1,4 @@
-//===------------- objects.cu - NVPTX OpenMP GPU objects --------- CUDA -*-===//
+//===------------ omp_data.cu - NVPTX OpenMP GPU objects --------- CUDA -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "omptarget-nvptx.h"
-#include "state-queue.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // global data holding OpenMP state information
