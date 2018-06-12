@@ -34,6 +34,8 @@ struct SparkInfo {
   bool UseThreads;
   Verbosity VerboseMode;
   bool KeepTmpFiles;
+  std::string SchedulingSize;
+  std::string SchedulingKind;
   uintptr_t currAddr;
 };
 

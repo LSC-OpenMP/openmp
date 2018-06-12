@@ -310,7 +310,8 @@ int32_t GenericProvider::submit_local() {
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
 
-  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "ERROR: Spark job failed\n");
     exit(EXIT_FAILURE);
   }
@@ -349,6 +350,10 @@ std::string GenericProvider::get_job_args() {
     args += " " + spark.CompressionFormat;
   else
     args += " false";
+
+  args += " " + spark.SchedulingSize;
+  args += " " + spark.SchedulingKind;
+  args += " " + std::to_string(spark.VerboseMode);
 
   return args;
 }

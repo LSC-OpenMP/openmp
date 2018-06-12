@@ -32,7 +32,6 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Local Provider:", __VA_ARGS__)
 
-static std::string working_path;
 
 LocalProvider::~LocalProvider() {
   if (!spark.KeepTmpFiles)
@@ -48,15 +47,8 @@ int32_t LocalProvider::parse_config(INIReader *reader) {
 }
 
 int32_t LocalProvider::init_device() {
-  int retval;
   // Create the working folder
-  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
-  char *tempdir = mkdtemp(tempdir_template);
-  if (tempdir == NULL) {
-    perror("ERROR: generating temp folder name\n");
-    exit(OFFLOAD_FAIL);
-  }
-  working_path = tempdir;
+  working_path = "/tmp/ompcloud.local." + random_string(8);
   std::string cmd("mkdir -p " + working_path + "/" + spark.WorkingDir);
   exec_cmd(cmd.c_str());
   return OFFLOAD_SUCCESS;
@@ -96,7 +88,7 @@ int32_t LocalProvider::submit_job() {
   if (spark.VerboseMode != Verbosity::quiet)
     DP("Submit Spark job\n");
 
-  std::string cmd = "spark-submit";
+  std::string cmd = spark.BinPath + "spark-submit";
 
   // Spark job entry point
   cmd += " " + spark.AdditionalArgs;
@@ -106,7 +98,8 @@ int32_t LocalProvider::submit_job() {
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();
 
-  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet)) {
+  if (execute_command(cmd.c_str(), spark.VerboseMode != Verbosity::quiet,
+                      spark.VerboseMode == Verbosity::debug)) {
     fprintf(stderr, "ERROR: Spark job failed\n");
     exit(OFFLOAD_FAIL);
   }
@@ -126,6 +119,10 @@ std::string LocalProvider::get_job_args() {
     args += " " + spark.CompressionFormat;
   else
     args += " false";
+
+  args += " " + spark.SchedulingSize;
+  args += " " + spark.SchedulingKind;
+  args += " " + std::to_string(spark.VerboseMode);
 
   return args;
 }

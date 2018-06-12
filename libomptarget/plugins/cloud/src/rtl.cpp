@@ -89,8 +89,6 @@ static std::vector<struct ProviderListEntry> ExistingProviderList = {
 
 static std::vector<struct ProviderListEntry> ProviderList;
 
-static std::string working_path;
-
 static char *library_tmpfile = strdup("/tmp/libompcloudXXXXXX");
 
 int NumberOfDevices;
@@ -101,6 +99,8 @@ class RTLDeviceInfoTy {
 
 public:
   std::list<DynLibTy> DynLibs;
+
+  std::string working_path;
 
   INIReader *reader;
 
@@ -177,12 +177,7 @@ public:
       verbose = Verbosity::info;
     }
 
-    char *tempdir = mkdtemp(strdup("/tmp/ompcloud.XXXXXX"));
-    if (tempdir == NULL) {
-      fprintf(stderr, "Error on mkdtemp\n");
-      exit(EXIT_FAILURE);
-    }
-    working_path = tempdir;
+    working_path = std::string("/tmp/ompcloud.") + random_string(6);
     std::string cmd("mkdir -p " + working_path);
 
     DP("%s\n", exec_cmd(cmd.c_str()).c_str());
@@ -298,17 +293,31 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
       DeviceInfo.reader->GetBoolean("Spark", "UseThreads", true),
       DeviceInfo.verbose,
       DeviceInfo.reader->GetBoolean("Spark", "KeepTmpFiles", false),
+      DeviceInfo.reader->Get("Spark", "SchedulingSize", "0"),
+      DeviceInfo.reader->Get("Spark", "SchedulingKind", "static"),
       1,
   };
 
-  // Checking if given WorkingDir ends in a slash for path concatenation.
-  // If it doesn't, add it
+  if (spark.WorkingDir.empty()) {
+    spark.WorkingDir = "ompcloud.workingdir" + random_string(8);
+  }
+
+  // Checking if given WorkingDir and BinPath ends in a slash for path
+  // concatenation. If it doesn't, add it!
   if (spark.WorkingDir.back() != '/') {
     spark.WorkingDir += "/";
   }
 
-  if (spark.WorkingDir.empty()) {
-    spark.WorkingDir = "ompcloud." + random_string(8);
+  if (!spark.BinPath.empty()) {
+    if (spark.BinPath.back() != '/') {
+      spark.BinPath += "/";
+    }
+
+    std::ifstream sparkSubmit((spark.BinPath + "spark-submit").c_str());
+     if (!sparkSubmit.good()) {
+       DP("ERROR: spark-submit is not accessible\n");
+       exit(EXIT_FAILURE);
+     }
   }
 
   if (spark.ServAddress.empty()) {
@@ -318,9 +327,8 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
     }
   }
 
-  if (spark.Mode == SparkMode::invalid || !spark.Package.compare("") ||
-      !spark.JarPath.compare("")) {
-    DP("ERROR: Invalid values in 'cloud_rtl.ini' for Spark!");
+  if (spark.Mode == SparkMode::invalid) {
+    DP("ERROR: Invalid Spark execution mode\n");
     exit(EXIT_FAILURE);
   }
 
@@ -349,16 +357,6 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
 __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
                                           __tgt_device_image *image) {
-  char tempdir_template[] = "/tmp/ompcloud.XXXXXX";
-  char *tempdir = mkdtemp(tempdir_template);
-  if (tempdir == NULL) {
-    DP("ERROR: Error on mkdtemp\n");
-    exit(EXIT_FAILURE);
-  }
-  working_path = tempdir;
-  std::string cmd("mkdir -p " + working_path);
-  if (DeviceInfo.verbose == Verbosity::debug)
-    DP("%s\n", exec_cmd(cmd.c_str()).c_str());
 
   DP("Dev %d: load binary from " DPxMOD " image\n", device_id,
      DPxPTR(image->ImageStart));
@@ -522,7 +520,7 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
   // Since we now need the hdfs file, we create it here
   std::string filename = std::to_string(id);
-  std::string host_filepath = working_path + "/" + filename;
+  std::string host_filepath = DeviceInfo.working_path + "/" + filename;
 
   int64_t sendingSize;
   if (needCompression) {
@@ -587,7 +585,7 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                            size >= MIN_SIZE_COMPRESSION;
 
   std::string filename = std::to_string(id);
-  std::string host_filepath = working_path + "/" + filename;
+  std::string host_filepath = DeviceInfo.working_path + "/" + filename;
 
   auto t_start = std::chrono::high_resolution_clock::now();
   DeviceInfo.Providers[device_id]->get_file(host_filepath, filename);

@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -40,10 +41,13 @@ std::string exec_cmd(const char *cmd) {
   return result;
 }
 
-int32_t execute_command(const char *command, bool print_result) {
+int32_t execute_command(const char *command, bool print_result,
+                        bool print_cmd) {
   FILE *fp = popen(command, "r");
 
-  // fprintf(stdout, "Running: %s\n", command);
+  if (print_cmd) {
+    fprintf(stdout, "Running: %s\n", command);
+  }
 
   if (fp == NULL) {
     fprintf(stderr, "ERROR: Failed to execute command\n");
@@ -67,6 +71,13 @@ int32_t execute_command(const char *command, bool print_result) {
 }
 
 std::string random_string(size_t length) {
+  // Initialize pseudo random generator
+  static bool isInit = false;
+  if (!isInit) {
+    srand(time(NULL));
+    isInit = true;
+  }
+
   auto randchar = []() -> char {
     const char charset[] = "0123456789"
                            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
