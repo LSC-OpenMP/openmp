@@ -19,13 +19,9 @@
 class CloudProvider {
 protected:
   SparkInfo spark;
-  char *currAddr;
 
 public:
-  CloudProvider(SparkInfo &sparkInfo) {
-    spark = sparkInfo;
-    currAddr = (char *)1;
-  }
+  CloudProvider(SparkInfo &sparkInfo) { spark = sparkInfo; }
 
   virtual ~CloudProvider() {}
 
@@ -36,15 +32,6 @@ public:
   virtual int32_t delete_file(std::string filename) = 0;
   virtual int32_t submit_job() = 0;
   virtual std::string get_job_args() = 0;
-
-  void *data_alloc(int64_t size, int32_t type, int32_t id) {
-    // NOTE: we do not create the HDFS file here because we do not want to
-    // waste time creating stuff that we might not need before (there may be
-    // unecessary allocations)
-
-    // Return fake target address
-    return (void *)currAddr++;
-  }
 };
 
 #endif

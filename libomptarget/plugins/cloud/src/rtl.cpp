@@ -13,8 +13,8 @@
 
 #include <cassert>
 #include <cstdio>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 #include <dlfcn.h>
 #include <ffi.h>
 #include <gelf.h>
@@ -25,14 +25,12 @@
 #include <string>
 #include <vector>
 
+#include <chrono>
 #include <fstream>
+#include <inttypes.h>
 #include <thread>
 #include <unistd.h>
-#include <chrono>
-#include <inttypes.h>
 
-#include "omptargetplugin.h"
-#include "rtl.h"
 #include "INIReader.h"
 #include "amazon.h"
 #include "azure.h"
@@ -40,7 +38,9 @@
 #include "cloud_util.h"
 #include "generic.h"
 #include "local.h"
+#include "omptargetplugin.h"
 #include "provider.h"
+#include "rtl.h"
 
 #ifndef TARGET_NAME
 #define TARGET_NAME Cloud
@@ -55,19 +55,19 @@ static int DebugLevel = 0;
 
 #define GETNAME2(name) #name
 #define GETNAME(name) GETNAME2(name)
-#define DP(...) \
-  do { \
-    if (DebugLevel > 0) { \
-      DEBUGP("Target " GETNAME(TARGET_NAME) " RTL", __VA_ARGS__); \
-    } \
+#define DP(...)                                                                \
+  do {                                                                         \
+    if (DebugLevel > 0) {                                                      \
+      DEBUGP("Target " GETNAME(TARGET_NAME) " RTL", __VA_ARGS__);              \
+    }                                                                          \
   } while (false)
 #else // OMPTARGET_DEBUG
-#define DP(...) {}
+#define DP(...)                                                                \
+  {}
 #endif // OMPTARGET_DEBUG
 
 #include "../../common/elf_common.c"
 
-#define NUMBER_OF_DEVICES 4
 #define OFFLOADSECTIONNAME ".omp_offloading.entries"
 
 /// Array of Dynamic libraries loaded for this target.
@@ -91,13 +91,13 @@ static std::vector<struct ProviderListEntry> ProviderList;
 
 static char *library_tmpfile = strdup("/tmp/libompcloudXXXXXX");
 
-int NumberOfDevices;
-
 /// Class containing all the device information.
 class RTLDeviceInfoTy {
   std::vector<FuncOrGblEntryTy> FuncGblEntries;
 
 public:
+  int NumberOfDevices;
+
   std::list<DynLibTy> DynLibs;
 
   std::string working_path;
@@ -105,6 +105,8 @@ public:
   INIReader *reader;
 
   Verbosity verbose;
+
+  uintptr_t CurrentTargetDataPtr;
 
   std::vector<SparkInfo> SparkClusters;
   std::vector<CloudProvider *> Providers;
@@ -149,20 +151,30 @@ public:
     return &E.Table;
   }
 
-  RTLDeviceInfoTy(int32_t num_devices) {
+  RTLDeviceInfoTy() {
 #ifdef OMPTARGET_DEBUG
     if (char *envStr = getenv("LIBOMPTARGET_DEBUG")) {
       DebugLevel = std::stoi(envStr);
     }
 #endif // OMPTARGET_DEBUG
 
-    std::string ConfigPath = std::string(getenv(OMPCLOUD_CONF_ENV.c_str()));
+    NumberOfDevices = 0;
+    CurrentTargetDataPtr = 1;
+
+    std::string ConfigPath;
+    if (char *envStr = getenv(OMPCLOUD_CONF_ENV.c_str())) {
+      ConfigPath = std::string(envStr);
+    } else {
+      DP("There is no configuration file describing cloud devices.\n");
+      return;
+    }
+
     reader = new INIReader(ConfigPath);
 
     if (reader->ParseError() < 0) {
       fprintf(stderr, "ERROR: Path to OmpCloud configuration seems wrong: %s\n",
               ConfigPath.c_str());
-      exit(EXIT_FAILURE);
+      return;
     }
 
     std::string vmode = reader->Get("Spark", "VerboseMode", "info");
@@ -181,8 +193,6 @@ public:
     std::string cmd("mkdir -p " + working_path);
 
     DP("%s\n", exec_cmd(cmd.c_str()).c_str());
-
-    NumberOfDevices = 0;
 
     // Checking how many providers we have in the configuration file
     for (auto entry : ExistingProviderList) {
@@ -206,7 +216,7 @@ public:
 
     assert(NumberOfDevices == 1 && "Do not support more than 1 device!");
 
-    FuncGblEntries.resize(num_devices);
+    FuncGblEntries.resize(NumberOfDevices);
     SparkClusters.resize(NumberOfDevices);
     Providers.resize(NumberOfDevices);
     ElapsedTimes = std::vector<ElapsedTime>(NumberOfDevices);
@@ -232,6 +242,11 @@ public:
         remove(lib.FileName);
       }
     }
+
+    // Do not do anything if there was no device
+    if (NumberOfDevices == 0)
+      return;
+
     if (verbose != Verbosity::quiet)
       for (int i = 0; i < NumberOfDevices; i++) {
         ElapsedTime &timing = ElapsedTimes[i];
@@ -247,7 +262,7 @@ public:
   }
 };
 
-static RTLDeviceInfoTy DeviceInfo(NUMBER_OF_DEVICES);
+static RTLDeviceInfoTy DeviceInfo;
 
 #ifdef __cplusplus
 extern "C" {
@@ -257,7 +272,7 @@ int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
   return elf_check_machine(image, EM_X86_64, 9003);
 }
 
-int32_t __tgt_rtl_number_of_devices() { return NUMBER_OF_DEVICES; }
+int32_t __tgt_rtl_number_of_devices() { return DeviceInfo.NumberOfDevices; }
 
 int32_t __tgt_rtl_init_device(int32_t device_id) {
 
@@ -314,10 +329,10 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
     }
 
     std::ifstream sparkSubmit((spark.BinPath + "spark-submit").c_str());
-     if (!sparkSubmit.good()) {
-       DP("ERROR: spark-submit is not accessible\n");
-       exit(EXIT_FAILURE);
-     }
+    if (!sparkSubmit.good()) {
+      DP("ERROR: spark-submit is not accessible\n");
+      exit(EXIT_FAILURE);
+    }
   }
 
   if (spark.ServAddress.empty()) {
@@ -360,8 +375,6 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 
   DP("Dev %d: load binary from " DPxMOD " image\n", device_id,
      DPxPTR(image->ImageStart));
-
-  assert(device_id >= 0 && device_id < NUMBER_OF_DEVICES && "bad dev id");
 
   size_t ImageSize = (size_t)image->ImageEnd - (size_t)image->ImageStart;
   size_t NumEntries = (size_t)(image->EntriesEnd - image->EntriesBegin);
@@ -462,7 +475,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   Elf64_Addr entries_addr = libInfo->l_addr + entries_offset;
 
   DP("Pointer to first entry to be loaded is (" DPxMOD ").\n",
-      DPxPTR(entries_addr));
+     DPxPTR(entries_addr));
 
   // Table of pointers to all the entries in the target.
   __tgt_offload_entry *entries_table = (__tgt_offload_entry *)entries_addr;
@@ -477,7 +490,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   }
 
   DP("Entries table range is (" DPxMOD ")->(" DPxMOD ")\n",
-      DPxPTR(entries_begin), DPxPTR(entries_end));
+     DPxPTR(entries_begin), DPxPTR(entries_end));
   DeviceInfo.createOffloadTable(device_id, entries_begin, entries_end);
 
   elf_end(e);
@@ -487,19 +500,20 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
 }
 
 void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr) {
-  int id = 0; // TODO: need an id?
+  uintptr_t tgt_ptr = DeviceInfo.CurrentTargetDataPtr++;
 
-  if (id >= 0) {
-    // Write entry in the address table
-    std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
-    ofs << id << ";" << size << ";" << std::endl;
-    ofs.close();
+  // if (id >= 0) {
+  // Write entry in the address table
+  std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
+  ofs << tgt_ptr << ";" << size << ";" << std::endl;
+  ofs.close();
 
-    if (DeviceInfo.verbose != Verbosity::quiet)
-      DP("Adding '%d' of size %ld to the address table\n", id, size);
-  }
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Adding '%" PRIxPTR "' of size %ld to the address table\n", tgt_ptr,
+       size);
+  //}
 
-  return DeviceInfo.Providers[device_id]->data_alloc(size, 0 /*FIXME: type*/, 0/*FIXME: id*/);
+  return (void *)tgt_ptr;
 }
 
 static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
@@ -652,13 +666,8 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                               int64_t size) {
-  int id = 0; // TODO: How to get the variable id?
+  uintptr_t id = (uintptr_t)tgt_ptr;
 
-  if (id < 0) {
-    if (DeviceInfo.verbose != Verbosity::quiet)
-      DP("No need to submit pointer\n");
-    return OFFLOAD_SUCCESS;
-  }
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
     DeviceInfo.submitting_threads[device_id].push_back(
         std::thread(data_submit, device_id, tgt_ptr, hst_ptr, size, id));
@@ -670,7 +679,7 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size) {
-  int id = 0; // TODO: How to get the variable id?
+  uintptr_t id = (uintptr_t)tgt_ptr;
 
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
     DeviceInfo.retrieving_threads[device_id].push_back(
@@ -683,13 +692,7 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 }
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
-  int id = 0; // TODO: How to get the variable id?
-
-  if (id < 0) {
-    if (DeviceInfo.verbose != Verbosity::quiet)
-      DP("No file to delete\n");
-    return OFFLOAD_SUCCESS;
-  }
+  uintptr_t id = (uintptr_t)tgt_ptr;
 
   std::string filename = std::to_string(id);
   // FIXME: Check retrieving thread is over before deleting data
@@ -699,8 +702,11 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
-    void **tgt_args, ptrdiff_t *tgt_offsets, int32_t arg_num, int32_t team_num,
-    int32_t thread_limit, uint64_t loop_tripcount /*not used*/) {
+                                         void **tgt_args,
+                                         ptrdiff_t *tgt_offsets,
+                                         int32_t arg_num, int32_t team_num,
+                                         int32_t thread_limit,
+                                         uint64_t loop_tripcount /*not used*/) {
   // ignore team num and thread limit.
 
   // Use libffi to launch execution.
@@ -727,16 +733,17 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   DP("Running entry point at " DPxMOD "...\n", DPxPTR(tgt_entry_ptr));
 
   void (*entry)(void);
-  *((void**) &entry) = tgt_entry_ptr;
+  *((void **)&entry) = tgt_entry_ptr;
   ffi_call(&cif, entry, NULL, &args[0]);
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
-    void **tgt_args, ptrdiff_t *tgt_offsets, int32_t arg_num) {
+                                    void **tgt_args, ptrdiff_t *tgt_offsets,
+                                    int32_t arg_num) {
   // use one team and one thread.
   return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
-      tgt_offsets, arg_num, 1, 1, 0);
+                                          tgt_offsets, arg_num, 1, 1, 0);
 }
 
 #ifdef __cplusplus

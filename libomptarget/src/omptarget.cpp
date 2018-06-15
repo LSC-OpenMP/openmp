@@ -59,7 +59,8 @@ static const char *RTLNames[] = {
     /* AArch64 target    */ "libomptarget.rtl.aarch64.so",
     /* SmartNIC target   */ "libomptarget.rtl.smartnic.so",
     /* Intel HARP target */ "libomptarget.rtl.harp.so",
-    /* Cloud target      */ "libomptarget.rtl.cloud.so"};
+    /* Cloud target      */ "libomptarget.rtl.cloud.so"
+};
 
 // forward declarations
 struct RTLInfoTy;

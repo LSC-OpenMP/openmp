@@ -32,7 +32,6 @@
 #define DP(...)                                                                \
   DEBUGP("Target " GETNAME(TARGET_NAME) " RTL, Local Provider:", __VA_ARGS__)
 
-
 LocalProvider::~LocalProvider() {
   if (!spark.KeepTmpFiles)
     remove_directory(working_path.c_str());

@@ -29,7 +29,7 @@ CloudProvider *createGenericProvider(SparkInfo &sparkInfo);
 
 class GenericProvider : public CloudProvider {
 protected:
-  void* fs;
+  void *fs;
   HdfsInfo hinfo;
 
   int32_t submit_cluster();
