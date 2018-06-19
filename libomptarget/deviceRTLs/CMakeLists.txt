@@ -13,3 +13,4 @@
 
 add_subdirectory(nvptx)
 add_subdirectory(spark)
+add_subdirectory(jni)

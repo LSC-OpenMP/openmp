@@ -25,6 +25,7 @@ public:
 
   virtual ~CloudProvider() {}
 
+  virtual std::string get_cloud_path(std::string filename) = 0;
   virtual int32_t parse_config(INIReader *reader) = 0;
   virtual int32_t init_device() = 0;
   virtual int32_t send_file(std::string filename, std::string tgtfilename) = 0;

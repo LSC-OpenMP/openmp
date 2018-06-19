@@ -54,7 +54,7 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t ID,
 // used to generate a table of target variables to pass to
 // __tgt_rtl_run_region(). The __tgt_rtl_data_alloc() returns NULL in
 // case an error occurred on the target device.
-void *__tgt_rtl_data_alloc(int32_t ID, int64_t Size, void *HostPtr);
+void *__tgt_rtl_data_alloc(int32_t ID, int64_t Size, void *HostPtr, int64_t Type);
 
 // Pass the data content to the target device using the target address.
 // In case of success, return zero. Otherwise, return an error code.
@@ -76,12 +76,12 @@ int32_t __tgt_rtl_data_delete(int32_t ID, void *TargetPtr);
 // to the outlined function on device side. In case of success, return zero.
 // Otherwise, return an error code.
 int32_t __tgt_rtl_run_target_region(int32_t ID, void *Entry, void **Args,
-                                    ptrdiff_t *Offsets, int32_t NumArgs);
+                                    ptrdiff_t *Offsets, int64_t *Sizes, int32_t NumArgs);
 
 // Similar to __tgt_rtl_run_target_region, but additionally specify the
 // number of teams to be created and a number of threads in each team.
 int32_t __tgt_rtl_run_target_team_region(int32_t ID, void *Entry, void **Args,
-                                         ptrdiff_t *Offsets, int32_t NumArgs,
+                                         ptrdiff_t *Offsets, int64_t *Sizes, int32_t NumArgs,
                                          int32_t NumTeams, int32_t ThreadLimit,
                                          uint64_t loop_tripcount);
 

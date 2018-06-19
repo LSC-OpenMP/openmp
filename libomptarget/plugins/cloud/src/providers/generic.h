@@ -39,6 +39,8 @@ public:
   GenericProvider(SparkInfo sparkInfo) : CloudProvider(sparkInfo) {}
   ~GenericProvider() {}
 
+  virtual std::string get_cloud_path(std::string filename);
+
   virtual int32_t parse_config(INIReader *reader);
   virtual int32_t init_device();
   virtual int32_t send_file(std::string filename, std::string tgtfilename);

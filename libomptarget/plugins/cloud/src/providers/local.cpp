@@ -99,8 +99,8 @@ int32_t LocalProvider::submit_job() {
 
   // Spark job entry point
   cmd += " " + spark.AdditionalArgs;
-  cmd += " --name " + std::string("\"") + __progname + std::string("\"") +
-         cmd += " --class " + spark.Package + " " + spark.JarPath;
+  cmd += " --name " + std::string("\"") + __progname + std::string("\"");
+  cmd += " --class " + spark.Package + " " + spark.JarPath;
 
   // Execution arguments pass to the spark kernel
   cmd += " " + get_job_args();

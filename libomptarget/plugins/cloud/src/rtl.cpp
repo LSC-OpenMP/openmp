@@ -28,6 +28,7 @@
 #include <chrono>
 #include <fstream>
 #include <inttypes.h>
+#include <iomanip>
 #include <thread>
 #include <unistd.h>
 
@@ -98,6 +99,20 @@ class RTLDeviceInfoTy {
 public:
   int NumberOfDevices;
 
+  /// \brief Call to void MapArgIdToTargetPtr(int comp_id, int tgt_ptr)
+
+  /// Map for shadow pointers
+  struct AddrTableValTy {
+    void *HstPtr;
+    uintptr_t TgtPtrAsInt;
+    int64_t Size;
+    int64_t Type;
+    int32_t ScalaId;
+  };
+  typedef std::map<void *, AddrTableValTy> AddrTableListTy;
+
+  AddrTableListTy AddrTableMap;
+
   std::list<DynLibTy> DynLibs;
 
   std::string working_path;
@@ -151,7 +166,7 @@ public:
     return &E.Table;
   }
 
-  RTLDeviceInfoTy() {
+  RTLDeviceInfoTy() : AddrTableMap() {
 #ifdef OMPTARGET_DEBUG
     if (char *envStr = getenv("LIBOMPTARGET_DEBUG")) {
       DebugLevel = std::stoi(envStr);
@@ -499,21 +514,20 @@ __tgt_target_table *__tgt_rtl_load_binary(int32_t device_id,
   return DeviceInfo.getOffloadEntriesTable(device_id);
 }
 
-void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr) {
-  uintptr_t tgt_ptr = DeviceInfo.CurrentTargetDataPtr++;
+void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr,
+                           int64_t type) {
+  uintptr_t tgt_ptr_as_int = DeviceInfo.CurrentTargetDataPtr++;
+  void *tgt_ptr = reinterpret_cast<void *>(tgt_ptr_as_int);
 
-  // if (id >= 0) {
-  // Write entry in the address table
-  std::ofstream ofs(DeviceInfo.AddressTables[device_id], std::ios_base::app);
-  ofs << tgt_ptr << ";" << size << ";" << std::endl;
-  ofs.close();
+  DeviceInfo.AddrTableMap[tgt_ptr] = {hst_ptr, tgt_ptr_as_int, size, type, -1};
 
   if (DeviceInfo.verbose != Verbosity::quiet)
-    DP("Adding '%" PRIxPTR "' of size %ld to the address table\n", tgt_ptr,
-       size);
+    DP("Adding '%" PRIxPTR "' (Size=%ld - Type=0x%" PRIx64
+       ") to the address table\n",
+       tgt_ptr_as_int, size, type);
   //}
 
-  return reinterpret_cast<void *>(tgt_ptr);
+  return tgt_ptr;
 }
 
 static int32_t data_submit(int32_t device_id, void *hst_ptr, size_t size,
@@ -672,6 +686,11 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                               int64_t size) {
   int64_t id = int64_t(tgt_ptr);
 
+  if (DeviceInfo.AddrTableMap.find(tgt_ptr) == DeviceInfo.AddrTableMap.end()) {
+    DP("Arg not find in the address table\n");
+    return OFFLOAD_FAIL;
+  }
+
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
     DeviceInfo.submitting_threads[device_id].push_back(
         std::thread(data_submit, device_id, hst_ptr, size, id));
@@ -701,14 +720,16 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
   // FIXME: Check retrieving thread is over before deleting data
   // return DeviceInfo.Providers[device_id]->delete_file(filename);
 
+  DeviceInfo.AddrTableMap.erase(tgt_ptr);
+
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
                                          void **tgt_args,
                                          ptrdiff_t *tgt_offsets,
-                                         int32_t arg_num, int32_t team_num,
-                                         int32_t thread_limit,
+                                         int64_t *tgt_sizes, int32_t arg_num,
+                                         int32_t team_num, int32_t thread_limit,
                                          uint64_t loop_tripcount /*not used*/) {
   // ignore team num and thread limit.
 
@@ -716,16 +737,20 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
   ffi_cif cif;
 
   // All args are references.
-  std::vector<ffi_type *> args_types(arg_num, &ffi_type_pointer);
-  std::vector<void *> args(arg_num);
-  std::vector<void *> ptrs(arg_num);
+  std::vector<ffi_type *> args_types(2 * arg_num, &ffi_type_pointer);
+  std::vector<void *> args(2 * arg_num);
+  std::vector<void *> ptrs(2 * arg_num);
+
+  std::vector<int> args_id(arg_num);
 
   for (int32_t i = 0; i < arg_num; ++i) {
     ptrs[i] = (void *)((intptr_t)tgt_args[i] + tgt_offsets[i]);
+    ptrs[arg_num + i] = (void *)&args_id[i];
     args[i] = &ptrs[i];
+    args[arg_num + i] = &ptrs[arg_num + i];
   }
 
-  ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_num,
+  ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, 2 * arg_num,
                                    &ffi_type_void, &args_types[0]);
 
   assert(status == FFI_OK && "Unable to prepare target launch!");
@@ -737,16 +762,95 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
 
   void (*entry)(void);
   *((void **)&entry) = tgt_entry_ptr;
-  ffi_call(&cif, entry, NULL, &args[0]);
-  return OFFLOAD_SUCCESS;
+  ffi_call(&cif, entry, nullptr, &args[0]);
+
+  auto &AddrTableMap = DeviceInfo.AddrTableMap;
+  auto AddrTablePath = DeviceInfo.AddressTables[device_id];
+
+  for (uint32_t i = 0; i < arg_num; ++i) {
+    if (AddrTableMap.find(ptrs[i]) == AddrTableMap.end()) {
+      DP("Arg not find in the address table: consider as literal passed by "
+         "value (%ld)\n",
+         tgt_sizes[i]);
+      uintptr_t tgt_ptr_as_int = (uintptr_t)ptrs[i];
+      DeviceInfo.AddrTableMap[ptrs[i]] = {ptrs[i], tgt_ptr_as_int, tgt_sizes[i],
+                                          OMP_TGT_MAPTYPE_LITERAL, args_id[i]};
+    } else {
+      AddrTableMap[ptrs[i]].ScalaId = args_id[i];
+    }
+  }
+
+  std::ofstream ofs(AddrTablePath, std::ios_base::app);
+
+  for (uint32_t i = 0; i < arg_num; ++i) {
+    auto ArgInfo = AddrTableMap[ptrs[i]];
+    // Write entry in the address table
+    ofs << ArgInfo.TgtPtrAsInt << ";" << std::to_string(ArgInfo.Size) << ";"
+        << std::to_string(ArgInfo.Type) << ";"
+        << std::to_string(ArgInfo.ScalaId) << ";";
+    if (ArgInfo.Type & OMP_TGT_MAPTYPE_LITERAL) {
+      char *buf = (char *)&tgt_args[i];
+      for (int j = 0; j < ArgInfo.Size; j++) {
+        DP("ARG BY VALUE = %d \n", static_cast<int>(buf[j]));
+        ofs << std::hex << std::setw(2) << std::setfill('0')
+            << static_cast<int>(buf[j]);
+      }
+    } else
+      ofs << "0";
+    ofs << ";" << std::endl;
+    DP("%ld = %ld; %ld; %d;\n", ArgInfo.TgtPtrAsInt, ArgInfo.Size, ArgInfo.Type,
+       ArgInfo.ScalaId);
+  }
+  ofs.close();
+
+  DP("address table written in %s\n", AddrTablePath.c_str());
+
+  ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
+
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Send library and address table to the Spark driver\n");
+
+  DeviceInfo.Providers[device_id]->send_file(AddrTablePath.c_str(),
+                                             "addressTable");
+
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Send Library: %s --> %s\n", library_tmpfile,
+       DeviceInfo.Providers[device_id]->get_cloud_path("libmr.so").c_str());
+  DeviceInfo.Providers[device_id]->send_file(library_tmpfile, "libmr.so");
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Done!\n");
+
+  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
+    remove(AddrTablePath.c_str());
+
+  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
+    for (auto it = DeviceInfo.submitting_threads[device_id].begin();
+         it != DeviceInfo.submitting_threads[device_id].end(); it++) {
+      (*it).join();
+    }
+    DeviceInfo.submitting_threads[device_id].clear();
+  }
+
+  auto t_start = std::chrono::high_resolution_clock::now();
+  int32_t ret_val = DeviceInfo.Providers[device_id]->submit_job();
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_delay =
+      std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+  timing.SparkExecutionTime += t_delay;
+
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Spark job executed in %lds\n", t_delay);
+
+  return ret_val;
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
                                     void **tgt_args, ptrdiff_t *tgt_offsets,
-                                    int32_t arg_num) {
+                                    int64_t *tgt_sizes, int32_t arg_num) {
   // use one team and one thread.
   return __tgt_rtl_run_target_team_region(device_id, tgt_entry_ptr, tgt_args,
-                                          tgt_offsets, arg_num, 1, 1, 0);
+                                          tgt_offsets, tgt_sizes, arg_num, 1, 1,
+                                          0);
 }
 
 #ifdef __cplusplus

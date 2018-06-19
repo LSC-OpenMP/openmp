@@ -174,7 +174,7 @@ struct DeviceTy {
   long getMapEntryRefCnt(void *HstPtrBegin);
   LookupResult lookupMapping(void *HstPtrBegin, int64_t Size);
   void *getOrAllocTgtPtr(void *HstPtrBegin, void *HstPtrBase, int64_t Size,
-      bool &IsNew, bool IsImplicit, bool UpdateRefCount = true);
+      int64_t Type, bool &IsNew, bool IsImplicit, bool UpdateRefCount = true);
   void *getTgtPtrBegin(void *HstPtrBegin, int64_t Size);
   void *getTgtPtrBegin(void *HstPtrBegin, int64_t Size, bool &IsLast,
       bool UpdateRefCount);
@@ -190,10 +190,10 @@ struct DeviceTy {
   int32_t data_retrieve(void *HstPtrBegin, void *TgtPtrBegin, int64_t Size);
 
   int32_t run_region(void *TgtEntryPtr, void **TgtVarsPtr,
-      ptrdiff_t *TgtOffsets, int32_t TgtVarsSize);
+      ptrdiff_t *TgtOffsets, int64_t *TgtVarsSize, int32_t NumTgtVars);
   int32_t run_team_region(void *TgtEntryPtr, void **TgtVarsPtr,
-      ptrdiff_t *TgtOffsets, int32_t TgtVarsSize, int32_t NumTeams,
-      int32_t ThreadLimit, uint64_t LoopTripCount);
+      ptrdiff_t *TgtOffsets, int64_t *TgtVarsSize, int32_t NumTgtVars,
+      int32_t NumTeams, int32_t ThreadLimit, uint64_t LoopTripCount);
 
 private:
   // Call to RTL
@@ -209,14 +209,14 @@ struct RTLInfoTy {
   typedef int32_t(number_of_devices_ty)();
   typedef int32_t(init_device_ty)(int32_t);
   typedef __tgt_target_table *(load_binary_ty)(int32_t, void *);
-  typedef void *(data_alloc_ty)(int32_t, int64_t, void *);
+  typedef void *(data_alloc_ty)(int32_t, int64_t, void *, int64_t);
   typedef int32_t(data_submit_ty)(int32_t, void *, void *, int64_t);
   typedef int32_t(data_retrieve_ty)(int32_t, void *, void *, int64_t);
   typedef int32_t(data_delete_ty)(int32_t, void *);
   typedef int32_t(run_region_ty)(int32_t, void *, void **, ptrdiff_t *,
-                                 int32_t);
+                                 int64_t *, int32_t);
   typedef int32_t(run_team_region_ty)(int32_t, void *, void **, ptrdiff_t *,
-                                      int32_t, int32_t, int32_t, uint64_t);
+                                      int64_t *, int32_t, int32_t, int32_t, uint64_t);
 
   int32_t Idx;                     // RTL index, index is the number of devices
                                    // of other RTLs that were registered before,
@@ -529,7 +529,8 @@ EXTERN void *omp_target_alloc(size_t size, int device_num) {
   }
 
   DeviceTy &Device = Devices[device_num];
-  rc = Device.RTL->data_alloc(Device.RTLDeviceID, size, NULL);
+  rc = Device.RTL->data_alloc(Device.RTLDeviceID, size, NULL,
+      OMP_TGT_MAPTYPE_NONE);
   DP("omp_target_alloc returns device ptr " DPxMOD "\n", DPxPTR(rc));
   return rc;
 }
@@ -899,7 +900,8 @@ LookupResult DeviceTy::lookupMapping(void *HstPtrBegin, int64_t Size) {
 // If NULL is returned, then either data allocation failed or the user tried
 // to do an illegal mapping.
 void *DeviceTy::getOrAllocTgtPtr(void *HstPtrBegin, void *HstPtrBase,
-    int64_t Size, bool &IsNew, bool IsImplicit, bool UpdateRefCount) {
+    int64_t Size, int64_t Type, bool &IsNew, bool IsImplicit,
+    bool UpdateRefCount) {
   void *rc = NULL;
   DataMapMtx.lock();
   LookupResult lr = lookupMapping(HstPtrBegin, Size);
@@ -927,7 +929,8 @@ void *DeviceTy::getOrAllocTgtPtr(void *HstPtrBegin, void *HstPtrBase,
   } else if (Size) {
     // If it is not contained and Size > 0 we should create a new entry for it.
     IsNew = true;
-    uintptr_t tp = (uintptr_t)RTL->data_alloc(RTLDeviceID, Size, HstPtrBegin);
+    uintptr_t tp = (uintptr_t)RTL->data_alloc(RTLDeviceID, Size, HstPtrBegin,
+        Type);
     DP("Creating new map entry: HstBase=" DPxMOD ", HstBegin=" DPxMOD ", "
         "HstEnd=" DPxMOD ", TgtBegin=" DPxMOD "\n", DPxPTR(HstPtrBase),
         DPxPTR(HstPtrBegin), DPxPTR((uintptr_t)HstPtrBegin + Size), DPxPTR(tp));
@@ -1061,17 +1064,17 @@ int32_t DeviceTy::data_retrieve(void *HstPtrBegin, void *TgtPtrBegin,
 
 // Run region on device
 int32_t DeviceTy::run_region(void *TgtEntryPtr, void **TgtVarsPtr,
-    ptrdiff_t *TgtOffsets, int32_t TgtVarsSize) {
+    ptrdiff_t *TgtOffsets, int64_t *TgtVarsSize, int32_t NumTgtVars) {
   return RTL->run_region(RTLDeviceID, TgtEntryPtr, TgtVarsPtr, TgtOffsets,
-      TgtVarsSize);
+      TgtVarsSize, NumTgtVars);
 }
 
 // Run team region on device.
 int32_t DeviceTy::run_team_region(void *TgtEntryPtr, void **TgtVarsPtr,
-    ptrdiff_t *TgtOffsets, int32_t TgtVarsSize, int32_t NumTeams,
-    int32_t ThreadLimit, uint64_t LoopTripCount) {
+    ptrdiff_t *TgtOffsets, int64_t *TgtVarsSize, int32_t NumTgtVars,
+    int32_t NumTeams, int32_t ThreadLimit, uint64_t LoopTripCount) {
   return RTL->run_team_region(RTLDeviceID, TgtEntryPtr, TgtVarsPtr, TgtOffsets,
-      TgtVarsSize, NumTeams, ThreadLimit, LoopTripCount);
+      TgtVarsSize, NumTgtVars, NumTeams, ThreadLimit, LoopTripCount);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1513,7 +1516,7 @@ static int target_data_begin(DeviceTy &Device, int32_t arg_num,
       if (parent_idx < 0 || !(arg_types[parent_idx] & OMP_TGT_MAPTYPE_PRIVATE)) {
         // base is address of pointer.
         Pointer_TgtPtrBegin = Device.getOrAllocTgtPtr(HstPtrBase, HstPtrBase,
-            sizeof(void *), Pointer_IsNew, IsImplicit, UpdateRef);
+            sizeof(void *), arg_types[i], Pointer_IsNew, IsImplicit, UpdateRef);
         if (!Pointer_TgtPtrBegin) {
           DP("Call to getOrAllocTgtPtr returned null pointer (device failure or "
              "illegal mapping).\n");
@@ -1529,7 +1532,7 @@ static int target_data_begin(DeviceTy &Device, int32_t arg_num,
     }
 
     void *TgtPtrBegin = Device.getOrAllocTgtPtr(HstPtrBegin, HstPtrBase,
-        data_size, IsNew, IsImplicit, UpdateRef);
+        data_size, arg_types[i], IsNew, IsImplicit, UpdateRef);
     if (!TgtPtrBegin && data_size) {
       // If data_size==0, then the argument could be a zero-length pointer to
       // NULL, so getOrAlloc() returning NULL is not an error.
@@ -2044,6 +2047,7 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
 
   std::vector<void *> tgt_args;
   std::vector<ptrdiff_t> tgt_offsets;
+  std::vector<ptrdiff_t> tgt_sizes;
 
   // List of (first-)private arrays allocated for this target region
   std::vector<int32_t> privateMaps;
@@ -2084,7 +2088,7 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
       bool IsNew;
       // Allocate memory for (first-)private array
       TgtPtrBegin = Device.getOrAllocTgtPtr(HstPtrBegin, HstPtrBase,
-          arg_sizes[i], IsNew, /*IsImplicit=*/true);
+          arg_sizes[i], arg_types[i], IsNew, /*IsImplicit=*/true);
       assert(IsNew && "Expected to allocate private memory");
       if (!TgtPtrBegin) {
         DP ("Data allocation for %sprivate array " DPxMOD " failed\n",
@@ -2132,6 +2136,7 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
     }
     tgt_args.push_back(TgtPtrBegin);
     tgt_offsets.push_back(TgtBaseOffset);
+    tgt_sizes.push_back(arg_sizes[i]);
   }
 
   assert(tgt_args.size() == tgt_offsets.size() &&
@@ -2148,11 +2153,11 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
         DPxPTR(TargetTable->EntriesBegin[TM->Index].addr), TM->Index);
     if (IsTeamConstruct) {
       rc = Device.run_team_region(TargetTable->EntriesBegin[TM->Index].addr,
-          &tgt_args[0], &tgt_offsets[0], tgt_args.size(), team_num,
+          &tgt_args[0], &tgt_offsets[0], &tgt_sizes[0], tgt_args.size(), team_num,
           thread_limit, ltc);
     } else {
       rc = Device.run_region(TargetTable->EntriesBegin[TM->Index].addr,
-          &tgt_args[0], &tgt_offsets[0], tgt_args.size());
+          &tgt_args[0], &tgt_offsets[0], &tgt_sizes[0], tgt_args.size());
     }
   } else {
     DP("Errors occurred while obtaining target arguments, skipping kernel "

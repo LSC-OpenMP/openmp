@@ -86,9 +86,13 @@ int32_t GenericProvider::init_device() {
   return OFFLOAD_SUCCESS;
 }
 
+std::string GenericProvider::get_cloud_path(std::string filename) {
+  return spark.WorkingDir + std::string(filename);
+}
+
 int32_t GenericProvider::send_file(std::string filename,
                                    std::string tgtfilename) {
-  std::string final_name = spark.WorkingDir + std::string(tgtfilename);
+  std::string final_name = get_cloud_path(tgtfilename);
 
   if (spark.VerboseMode != Verbosity::quiet)
     DP("submitting file %s as %s\n", filename.c_str(), final_name.c_str());
@@ -148,7 +152,7 @@ int32_t GenericProvider::send_file(std::string filename,
 
 int32_t GenericProvider::get_file(std::string host_filename,
                                   std::string filename) {
-  filename = spark.WorkingDir + filename;
+  filename = get_cloud_path(filename);
 
   std::ofstream hostfile(host_filename);
   if (!hostfile.is_open()) {
