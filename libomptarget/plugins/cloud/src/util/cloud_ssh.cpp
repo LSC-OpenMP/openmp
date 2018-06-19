@@ -22,7 +22,7 @@
 
 int ssh_verify_knownhost(ssh_session session) {
   int state;
-  char buf[10];
+  //char buf[10];
   state = ssh_is_server_known(session);
 
   switch (state) {
@@ -79,7 +79,7 @@ int ssh_copy(ssh_session session, const char *filename, const char *destpath,
   int fd = fileno(file);
   struct stat sjar;
   fstat(fd, &sjar);
-  int size = sjar.st_size;
+  size_t size = size_t(sjar.st_size);
 
   // fprintf(stdout, "Size => %d.\n", size);
 
@@ -92,7 +92,7 @@ int ssh_copy(ssh_session session, const char *filename, const char *destpath,
 
   ssh_scp scp;
   scp = ssh_scp_new(session, SSH_SCP_WRITE, destpath);
-  if (scp == NULL) {
+  if (scp == nullptr) {
     fprintf(stderr, "Error allocating scp session: %s\n",
             ssh_get_error(session));
     return SSH_ERROR;
@@ -146,7 +146,7 @@ int ssh_run(ssh_session session, const char *cmd, bool print_result) {
   int nbytes;
 
   ssh_channel channel = ssh_channel_new(session);
-  if (channel == NULL)
+  if (channel == nullptr)
     return SSH_ERROR;
 
   rc = ssh_channel_open_session(channel);
@@ -166,7 +166,7 @@ int ssh_run(ssh_session session, const char *cmd, bool print_result) {
   nbytes = ssh_channel_read(channel, buffer, sizeof(buffer), 1);
   while (nbytes > 0) {
     if (print_result &&
-        fwrite(buffer, 1, nbytes, stdout) != (unsigned int)nbytes) {
+        fwrite(buffer, 1, size_t(nbytes), stdout) != unsigned(nbytes)) {
       fprintf(stderr, "Problem when displaying ssh buffer\n");
       ssh_channel_close(channel);
       ssh_channel_free(channel);

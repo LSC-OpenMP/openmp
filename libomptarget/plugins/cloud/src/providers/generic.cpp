@@ -41,7 +41,7 @@ int32_t GenericProvider::parse_config(INIReader *reader) {
 
   hinfo = {
       reader->Get("HdfsProvider", "HostName", ""),
-      (int)reader->GetInteger("HdfsProvider", "Port", DEFAULT_HDFS_PORT),
+      uint16_t(reader->GetInteger("HdfsProvider", "Port", DEFAULT_HDFS_PORT)),
       reader->Get("HdfsProvider", "User", ""),
   };
 
@@ -67,7 +67,7 @@ int32_t GenericProvider::init_device() {
   hdfsBuilderSetUserName(builder, hinfo.UserName.c_str());
   fs = hdfsBuilderConnect(builder);
 
-  if (fs == NULL) {
+  if (fs == nullptr) {
     fprintf(stderr, "Connection problem with HDFS cluster. Check your "
                     "configuration file.\n");
     exit(EXIT_FAILURE);
@@ -75,8 +75,8 @@ int32_t GenericProvider::init_device() {
 
   hdfsFreeBuilder(builder);
 
-  if (hdfsExists((hdfsFS)fs, spark.WorkingDir.c_str()) < 0) {
-    retval = hdfsCreateDirectory((hdfsFS)fs, spark.WorkingDir.c_str());
+  if (hdfsExists(hdfsFS(fs), spark.WorkingDir.c_str()) < 0) {
+    retval = hdfsCreateDirectory(hdfsFS(fs), spark.WorkingDir.c_str());
     if (retval < 0) {
       fprintf(stderr, "ERROR: Cannot create HDFS working directory\n");
       exit(EXIT_FAILURE);
@@ -94,9 +94,9 @@ int32_t GenericProvider::send_file(std::string filename,
     DP("submitting file %s as %s\n", filename.c_str(), final_name.c_str());
 
   hdfsFile file =
-      hdfsOpenFile((hdfsFS)fs, final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
+      hdfsOpenFile(hdfsFS(fs), final_name.c_str(), O_WRONLY, BUFF_SIZE, 0, 0);
 
-  if (file == NULL) {
+  if (file == nullptr) {
     fprintf(stderr, "ERROR: Opening file in HDFS failed.\n");
     exit(EXIT_FAILURE);
   }
@@ -105,7 +105,7 @@ int32_t GenericProvider::send_file(std::string filename,
 
   if (!hstfile.is_open()) {
     fprintf(stderr, "ERROR: Opening host file %s failed.", filename.c_str());
-    hdfsCloseFile((hdfsFS)fs, file);
+    hdfsCloseFile(hdfsFS(fs), file);
     exit(EXIT_FAILURE);
   }
 
@@ -121,11 +121,11 @@ int32_t GenericProvider::send_file(std::string filename,
       }
     }
 
-    retval = hdfsWrite((hdfsFS)fs, file, buffer, hstfile.gcount());
+    retval = hdfsWrite(hdfsFS(fs), file, buffer, tSize(hstfile.gcount()));
 
     if (retval < 0) {
       fprintf(stderr, "ERROR: Writing on HDFS failed.\n");
-      hdfsCloseFile((hdfsFS)fs, file);
+      hdfsCloseFile(hdfsFS(fs), file);
       exit(EXIT_FAILURE);
     }
 
@@ -136,7 +136,7 @@ int32_t GenericProvider::send_file(std::string filename,
 
   hstfile.close();
 
-  retval = hdfsCloseFile((hdfsFS)fs, file);
+  retval = hdfsCloseFile(hdfsFS(fs), file);
 
   if (retval < 0) {
     fprintf(stderr, "ERROR: Closing on HDFS failed.\n");
@@ -156,18 +156,18 @@ int32_t GenericProvider::get_file(std::string host_filename,
     exit(EXIT_FAILURE);
   }
 
-  int retval = hdfsExists((hdfsFS)fs, filename.c_str());
+  int retval = hdfsExists(hdfsFS(fs), filename.c_str());
   if (retval < 0) {
     fprintf(stderr, "ERROR: File does not exist on HDFS %s\n",
             filename.c_str());
     exit(EXIT_FAILURE);
   }
 
-  hdfsFileInfo *fileInfo = hdfsGetPathInfo((hdfsFS)fs, filename.c_str());
-  int size = fileInfo->mSize;
+  hdfsFileInfo *fileInfo = hdfsGetPathInfo(hdfsFS(fs), filename.c_str());
+  size_t size = size_t(fileInfo->mSize);
 
-  hdfsFile file = hdfsOpenFile((hdfsFS)fs, filename.c_str(), O_RDONLY, 0, 0, 0);
-  if (file == NULL) {
+  hdfsFile file = hdfsOpenFile(hdfsFS(fs), filename.c_str(), O_RDONLY, 0, 0, 0);
+  if (file == nullptr) {
     fprintf(stderr, "ERROR: Opening failed on HDFS %s\n", filename.c_str());
     exit(EXIT_FAILURE);
   }
@@ -177,7 +177,9 @@ int32_t GenericProvider::get_file(std::string host_filename,
   int current_pos = 0;
 
   do {
-    retval = hdfsRead((hdfsFS)fs, file, (void *)buffer, BUFF_SIZE);
+    retval = hdfsRead(hdfsFS(fs), file,
+                      const_cast<void *>(static_cast<const void *>(buffer)),
+                      BUFF_SIZE);
     if (retval < 0) {
       fprintf(stderr, "Reading failed on HDFS %s.\n", filename.c_str());
       exit(EXIT_FAILURE);
@@ -188,9 +190,9 @@ int32_t GenericProvider::get_file(std::string host_filename,
     // fprintf(stdout, "Reading %d bytes\n", retval);
 
     hostfile.write(buffer, BUFF_SIZE);
-  } while (current_pos != size);
+  } while (size_t(current_pos) != size);
 
-  retval = hdfsCloseFile((hdfsFS)fs, file);
+  retval = hdfsCloseFile(hdfsFS(fs), file);
   if (retval < 0) {
     fprintf(stderr, "Closing file on HDFS failed %s.\n", filename.c_str());
     exit(EXIT_FAILURE);
@@ -204,7 +206,7 @@ int32_t GenericProvider::get_file(std::string host_filename,
 int32_t GenericProvider::delete_file(std::string filename) {
   DP("Deleting file '%s'\n", filename.c_str());
 
-  int retval = hdfsDelete((hdfsFS)fs, filename.c_str(), 0);
+  int retval = hdfsDelete(hdfsFS(fs), filename.c_str(), 0);
   if (retval < 0) {
     fprintf(stderr, "ERROR: Deleting HDFS file failed.\n");
     exit(EXIT_FAILURE);
@@ -228,7 +230,7 @@ int32_t GenericProvider::submit_cluster() {
 
   // init ssh session
   ssh_session session = ssh_new();
-  if (session == NULL) {
+  if (session == nullptr) {
     fprintf(stderr, "ERROR: Cannot create ssh channel.\n");
     exit(EXIT_FAILURE);
   }
@@ -255,7 +257,7 @@ int32_t GenericProvider::submit_cluster() {
     exit(EXIT_FAILURE);
   }
 
-  rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), NULL);
+  rc = ssh_userauth_publickey_auto(session, spark.UserName.c_str(), nullptr);
   if (rc == SSH_AUTH_ERROR) {
     fprintf(stderr, "Authentication failed: %s\n", ssh_get_error(session));
     exit(EXIT_FAILURE);

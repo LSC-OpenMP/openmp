@@ -294,7 +294,7 @@ int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   SparkInfo spark{
       DeviceInfo.reader->Get("Spark", "HostName", ""),
-      (int)DeviceInfo.reader->GetInteger("Spark", "Port", DEFAULT_SPARK_PORT),
+      int(DeviceInfo.reader->GetInteger("Spark", "Port", DEFAULT_SPARK_PORT)),
       mode,
       DeviceInfo.reader->Get("Spark", "User", DEFAULT_SPARK_USER),
       DeviceInfo.reader->Get("Spark", "BinPath", ""),
@@ -513,16 +513,17 @@ void *__tgt_rtl_data_alloc(int32_t device_id, int64_t size, void *hst_ptr) {
        size);
   //}
 
-  return (void *)tgt_ptr;
+  return reinterpret_cast<void *>(tgt_ptr);
 }
 
-static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
-                           int64_t size, int32_t id) {
-  float sizeInMB = size / (1024 * 1024);
+static int32_t data_submit(int32_t device_id, void *hst_ptr, size_t size,
+                           int64_t id) {
+  double sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
     fprintf(stderr,
-            "ERROR: Not supported -- size of %d is larger (%.2fMB) than the "
-            "maximal size of JVM's bytearrays (%.2fMB).\n",
+            "ERROR: Not supported -- size of %" PRId64
+            " is larger (%.2fMB) than the maximal size of JVM's bytearrays "
+            "(%.2fMB).\n",
             id, sizeInMB, MAX_SIZE_IN_MB);
     exit(EXIT_FAILURE);
   }
@@ -536,10 +537,11 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   std::string filename = std::to_string(id);
   std::string host_filepath = DeviceInfo.working_path + "/" + filename;
 
-  int64_t sendingSize;
+  size_t sendingSize;
   if (needCompression) {
     auto t_start = std::chrono::high_resolution_clock::now();
-    sendingSize = compress_to_file(host_filepath, (char *)hst_ptr, size);
+    sendingSize =
+        compress_to_file(host_filepath, static_cast<char *>(hst_ptr), size);
     auto t_end = std::chrono::high_resolution_clock::now();
     auto t_delay =
         std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start)
@@ -557,12 +559,12 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
       perror("ERROR: Failed to open temporary file\n");
       exit(EXIT_FAILURE);
     }
-    tmpfile.write((const char *)hst_ptr, size);
+    tmpfile.write(static_cast<char *>(hst_ptr), std::streamsize(size));
     tmpfile.close();
     sendingSize = size;
   }
 
-  float sendingSizeInMB = sendingSize / (1024 * 1024);
+  double sendingSizeInMB = sendingSize / (1024 * 1024);
   auto t_start = std::chrono::high_resolution_clock::now();
   int ret_val =
       DeviceInfo.Providers[device_id]->send_file(host_filepath, filename);
@@ -582,13 +584,14 @@ static int32_t data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   return ret_val;
 }
 
-static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
-                             int64_t size, int32_t id) {
-  float sizeInMB = size / (1024 * 1024);
+static int32_t data_retrieve(int32_t device_id, void *hst_ptr, size_t size,
+                             int64_t id) {
+  double sizeInMB = size / (1024 * 1024);
   if (size > MAX_JAVA_INT) {
     fprintf(stderr,
-            "ERROR: Not supported -- size of %d is larger (%.1fMB) than the "
-            "maximal size of JVM's bytearrays (%.1fMB).\n",
+            "ERROR: Not supported -- size of %" PRId64
+            " is larger (%.1fMB) than the maximal size of JVM's bytearrays "
+            "(%.1fMB).\n",
             id, sizeInMB, MAX_SIZE_IN_MB);
     exit(EXIT_FAILURE);
   }
@@ -616,9 +619,10 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   if (needDecompression) {
     auto t_start = std::chrono::high_resolution_clock::now();
     // Decompress data directly to the host memory
-    int decomp_size = decompress_file(host_filepath, (char *)hst_ptr, size);
+    size_t decomp_size =
+        decompress_file(host_filepath, static_cast<char *>(hst_ptr), size);
     if (decomp_size != size) {
-      fprintf(stderr, "Decompressed data are not the right size. => %d\n",
+      fprintf(stderr, "Decompressed data are not the right size. => %zu\n",
               decomp_size);
       exit(EXIT_FAILURE);
     }
@@ -666,26 +670,26 @@ static int32_t data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
 int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
                               int64_t size) {
-  uintptr_t id = (uintptr_t)tgt_ptr;
+  int64_t id = int64_t(tgt_ptr);
 
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
     DeviceInfo.submitting_threads[device_id].push_back(
-        std::thread(data_submit, device_id, tgt_ptr, hst_ptr, size, id));
+        std::thread(data_submit, device_id, hst_ptr, size, id));
   } else {
-    return data_submit(device_id, tgt_ptr, hst_ptr, size, id);
+    return data_submit(device_id, hst_ptr, size, id);
   }
   return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
                                 int64_t size) {
-  uintptr_t id = (uintptr_t)tgt_ptr;
+  int64_t id = (int64_t)tgt_ptr;
 
   if (DeviceInfo.SparkClusters[device_id].UseThreads) {
     DeviceInfo.retrieving_threads[device_id].push_back(
-        std::thread(data_retrieve, device_id, hst_ptr, tgt_ptr, size, id));
+        std::thread(data_retrieve, device_id, hst_ptr, size, id));
   } else {
-    return data_retrieve(device_id, hst_ptr, tgt_ptr, size, id);
+    return data_retrieve(device_id, hst_ptr, size_t(size), id);
   }
 
   return OFFLOAD_SUCCESS;
@@ -693,7 +697,6 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
 
 int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
   uintptr_t id = (uintptr_t)tgt_ptr;
-
   std::string filename = std::to_string(id);
   // FIXME: Check retrieving thread is over before deleting data
   // return DeviceInfo.Providers[device_id]->delete_file(filename);

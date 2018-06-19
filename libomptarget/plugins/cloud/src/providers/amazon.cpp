@@ -138,7 +138,7 @@ int32_t AmazonProvider::submit_job() {
   int verbosity = SSH_LOG_NOLOG;
   int port = 22;
 
-  if (aws_session == NULL) {
+  if (aws_session == nullptr) {
     fprintf(stderr, "ERROR: Cannot create ssh session\n");
     exit(EXIT_FAILURE);
   }
@@ -164,11 +164,11 @@ int32_t AmazonProvider::submit_job() {
     exit(EXIT_FAILURE);
   }
 
-  rc = ssh_userauth_publickey_auto(aws_session, spark.UserName.c_str(), NULL);
+  rc = ssh_userauth_publickey_auto(aws_session, spark.UserName.c_str(), nullptr);
   if (rc == SSH_AUTH_ERROR) {
     ssh_key pkey;
 
-    ssh_pki_import_privkey_file(ainfo.KeyFile.c_str(), NULL, NULL, NULL, &pkey);
+    ssh_pki_import_privkey_file(ainfo.KeyFile.c_str(), nullptr, nullptr, nullptr, &pkey);
     rc = ssh_userauth_publickey(aws_session, spark.UserName.c_str(), pkey);
 
     if (rc == SSH_AUTH_ERROR) {

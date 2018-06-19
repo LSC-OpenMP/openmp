@@ -72,6 +72,6 @@ const std::string DEFAULT_COMPRESSION_FORMAT = "gzip";
 // Maximal size of offloaded data is about 2GB
 // Size of JVM's ByteArrays are limited by MAX_JAVA_INT = 2^31-1
 const long MAX_JAVA_INT = 2147483647;
-const float MAX_SIZE_IN_MB = MAX_JAVA_INT / (1024 * 1024);
+const double MAX_SIZE_IN_MB = MAX_JAVA_INT / (1024 * 1024);
 
 #endif

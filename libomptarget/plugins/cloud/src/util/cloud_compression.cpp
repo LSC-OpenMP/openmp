@@ -24,20 +24,20 @@ size_t decompress_file(std::string comp_file, char *ptr_buff_out,
                        size_t buff_size) {
   int err;
   gzFile in = gzopen(comp_file.c_str(), "rb");
-  int len = gzread(in, ptr_buff_out, buff_size);
+  int len = gzread(in, ptr_buff_out, unsigned(buff_size));
   if (len < 0)
     fprintf(stderr, "Failed to decompress: %s", gzerror(in, &err));
   gzclose(in);
-  return len;
+  return size_t(len);
 }
 
 size_t compress_to_file(std::string comp_file, char *ptr_buff_in,
                         size_t buff_size) {
   int err;
   gzFile out = gzopen(comp_file.c_str(), "wb");
-  int len = gzwrite(out, ptr_buff_in, buff_size);
+  int len = gzwrite(out, ptr_buff_in, unsigned(buff_size));
   if (len < 0)
     fprintf(stderr, "Failed to compress: %s", gzerror(out, &err));
   gzclose(out);
-  return len;
+  return size_t(len);
 }

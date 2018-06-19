@@ -18,7 +18,7 @@
 
 struct HdfsInfo {
   std::string ServAddress;
-  int ServPort;
+  uint16_t ServPort;
   std::string UserName;
 };
 

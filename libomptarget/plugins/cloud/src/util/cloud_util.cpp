@@ -35,7 +35,7 @@ std::string exec_cmd(const char *cmd) {
   if (!pipe)
     throw std::runtime_error("popen() failed!");
   while (!feof(pipe.get())) {
-    if (fgets(buffer.data(), 128, pipe.get()) != NULL)
+    if (fgets(buffer.data(), 128, pipe.get()) != nullptr)
       result += buffer.data();
   }
   return result;
@@ -49,16 +49,16 @@ int32_t execute_command(const char *command, bool print_result,
     fprintf(stdout, "Running: %s\n", command);
   }
 
-  if (fp == NULL) {
+  if (fp == nullptr) {
     fprintf(stderr, "ERROR: Failed to execute command\n");
     return EXIT_FAILURE;
   }
 
   if (print_result) {
     char buf[512] = {0};
-    uint read = 0;
+    size_t read = 0;
 
-    while ((read = fread(buf, sizeof(char), 511, fp)) == 512) {
+    while ((read = fread(buf, sizeof(char), size_t(511), fp)) == 512) {
       buf[511] = 0;
       fprintf(stdout, "%s", buf);
     }
@@ -74,7 +74,7 @@ std::string random_string(size_t length) {
   // Initialize pseudo random generator
   static bool isInit = false;
   if (!isInit) {
-    srand(time(NULL));
+    srand(unsigned(time(nullptr)));
     isInit = true;
   }
 
@@ -102,16 +102,15 @@ int remove_directory(const char *path) {
 
     while (!r && (p = readdir(d))) {
       int r2 = -1;
-      char *buf;
-      size_t len;
+      ;
 
       /* Skip the names "." and ".." as we don't want to recurse on them. */
       if (!strcmp(p->d_name, ".") || !strcmp(p->d_name, "..")) {
         continue;
       }
 
-      len = path_len + strlen(p->d_name) + 2;
-      buf = (char *)malloc(len);
+      size_t len = path_len + strlen(p->d_name) + 2;
+      char *buf = new char[len];
 
       if (buf) {
         struct stat statbuf;
@@ -126,7 +125,7 @@ int remove_directory(const char *path) {
           }
         }
 
-        free(buf);
+        delete[] buf;
       }
 
       r = r2;
