@@ -710,35 +710,42 @@ int32_t __tgt_rtl_run_target_team_region(int32_t device_id, void *tgt_entry_ptr,
                                          int32_t arg_num, int32_t team_num,
                                          int32_t thread_limit,
                                          uint64_t loop_tripcount /*not used*/) {
-  // ignore team num and thread limit.
+  ElapsedTime &timing = DeviceInfo.ElapsedTimes[device_id];
 
-  // Use libffi to launch execution.
-  ffi_cif cif;
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Send library and address table to the Spark driver\n");
 
-  // All args are references.
-  std::vector<ffi_type *> args_types(arg_num, &ffi_type_pointer);
-  std::vector<void *> args(arg_num);
-  std::vector<void *> ptrs(arg_num);
+  const char *fileName = DeviceInfo.AddressTables[device_id].c_str();
+  DeviceInfo.Providers[device_id]->send_file(fileName, "addressTable");
 
-  for (int32_t i = 0; i < arg_num; ++i) {
-    ptrs[i] = (void *)((intptr_t)tgt_args[i] + tgt_offsets[i]);
-    args[i] = &ptrs[i];
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Send Library: %s\n", library_tmpfile);
+  DeviceInfo.Providers[device_id]->send_file(library_tmpfile, "libmr.so");
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Done!\n");
+
+  if (!DeviceInfo.SparkClusters[device_id].KeepTmpFiles)
+    remove(fileName);
+
+  if (DeviceInfo.SparkClusters[device_id].UseThreads) {
+    for (auto it = DeviceInfo.submitting_threads[device_id].begin();
+         it != DeviceInfo.submitting_threads[device_id].end(); it++) {
+      (*it).join();
+    }
+    DeviceInfo.submitting_threads[device_id].clear();
   }
 
-  ffi_status status = ffi_prep_cif(&cif, FFI_DEFAULT_ABI, arg_num,
-                                   &ffi_type_void, &args_types[0]);
+  auto t_start = std::chrono::high_resolution_clock::now();
+  int32_t ret_val = DeviceInfo.Providers[device_id]->submit_job();
+  auto t_end = std::chrono::high_resolution_clock::now();
+  auto t_delay =
+      std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+  timing.SparkExecutionTime += t_delay;
 
-  assert(status == FFI_OK && "Unable to prepare target launch!");
+  if (DeviceInfo.verbose != Verbosity::quiet)
+    DP("Spark job executed in %lds\n", t_delay);
 
-  if (status != FFI_OK)
-    return OFFLOAD_FAIL;
-
-  DP("Running entry point at " DPxMOD "...\n", DPxPTR(tgt_entry_ptr));
-
-  void (*entry)(void);
-  *((void **)&entry) = tgt_entry_ptr;
-  ffi_call(&cif, entry, NULL, &args[0]);
-  return OFFLOAD_SUCCESS;
+  return ret_val;
 }
 
 int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
