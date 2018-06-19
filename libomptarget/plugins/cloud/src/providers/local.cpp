@@ -59,19 +59,27 @@ std::string LocalProvider::get_cloud_path(std::string filename) {
 
 int32_t LocalProvider::send_file(std::string filename,
                                  std::string tgtfilename) {
-  remove(get_cloud_path(tgtfilename).c_str());
-  int rc = rename(filename.c_str(), get_cloud_path(tgtfilename).c_str());
-  if (rc < 0)
-    perror("Error renaming file");
+  std::string targetfilepath = get_cloud_path(tgtfilename);
+  remove(targetfilepath.c_str());
+  int rc = rename(filename.c_str(), targetfilepath.c_str());
+  if (rc < 0) {
+    fprintf(stderr, "Error renaming file: %s -> %s", filename.c_str(),
+            targetfilepath.c_str());
+    perror("");
+  }
   return OFFLOAD_SUCCESS;
 }
 
 int32_t LocalProvider::get_file(std::string host_filename,
                                 std::string filename) {
+  std::string targetfilepath = get_cloud_path(filename);
   remove(host_filename.c_str());
-  int rc = rename(get_cloud_path(filename).c_str(), host_filename.c_str());
-  if (rc < 0)
-    perror("Error renaming file");
+  int rc = rename(targetfilepath.c_str(), host_filename.c_str());
+  if (rc < 0) {
+    fprintf(stderr, "Error renaming file: %s -> %s", targetfilepath.c_str(),
+            host_filename.c_str());
+    perror("");
+  }
   return OFFLOAD_SUCCESS;
 }
 
