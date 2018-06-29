@@ -27,6 +27,8 @@
 # boost program_options : required by OPAE
 # JSON-C : required by OPAE
 
+# Xilinx AWS F1
+
 include (FindPackageHandleStandardArgs)
 include (FindUUID)
 include (FindJSON-C)
@@ -400,3 +402,80 @@ mark_as_advanced(
   LIBOMPTARGET_DEP_JSON-C_INCLUDE_DIRS
   LIBOMPTARGET_DEP_JSON-C_LIBRARIES)
 
+################################################################################
+# Looking for Xilinx Vivado ...
+################################################################################
+find_path (
+    LIBOMPTARGET_DEP_XILINX_VIVADO_INCLUDE_DIRS
+  NAMES
+    hls_fir.h
+  PATHS
+    /usr/include
+    /usr/local/include
+    /opt/local/include
+    /sw/include
+    ENV CPATH)
+
+find_package_handle_standard_args(
+  LIBOMPTARGET_DEP_XILINX_VIVADO
+  DEFAULT_MSG
+  LIBOMPTARGET_DEP_XILINX_VIVADO_INCLUDE_DIRS)
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_XILINX_VIVADO_INCLUDE_DIRS)
+
+################################################################################
+# Looking for Xilinx SDx ...
+################################################################################
+find_path (
+    LIBOMPTARGET_DEP_XILINX_SDX_INCLUDE_DIRS
+  NAMES
+    CL/opencl.h
+  PATHS
+    /usr/include
+    /usr/local/include
+    /opt/local/include
+    /sw/include
+    ENV CPATH)
+
+find_library (
+    LIBOMPTARGET_DEP_XILINX_SDX_STDCPP_LIBRARY
+  NAMES
+    stdc++
+  PATHS
+    /usr/lib
+    /usr/local/lib
+    /opt/local/lib
+    /sw/lib
+    ENV LIBRARY_PATH
+    ENV LD_LIBRARY_PATH)
+
+find_library (
+    LIBOMPTARGET_DEP_XILINX_SDX_XILINXOPENCL_LIBRARY
+  NAMES
+    xilinxopencl
+  PATHS
+    /usr/lib
+    /usr/local/lib
+    /opt/local/lib
+    /sw/lib
+    ENV LIBRARY_PATH
+    ENV LD_LIBRARY_PATH)
+
+set(LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES
+  ${LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES}
+  ${LIBOMPTARGET_DEP_XILINX_SDX_STDCPP_LIBRARY})
+
+set(LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES
+  ${LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES}
+  ${LIBOMPTARGET_DEP_XILINX_SDX_XILINXOPENCL_LIBRARY})
+
+find_package_handle_standard_args(
+  LIBOMPTARGET_DEP_XILINX_SDX
+  DEFAULT_MSG
+  LIBOMPTARGET_DEP_XILINX_SDX_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES)
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_XILINX_SDX_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES)
