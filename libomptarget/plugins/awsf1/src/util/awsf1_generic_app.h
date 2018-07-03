@@ -46,8 +46,10 @@ public:
   int finish();
   void* alloc_buffer(uint64_t size);
   void delete_buffer(void *tgt_ptr);
+  void submit_buffer(void *tgt_ptr, void *hst_ptr, int64_t size);
+  void retrieve_buffer(void *hst_ptr, void *tgt_ptr, int64_t size);
+
 
   int run();    ///< Return 0 if success
   int program(const char *module);
 };
-

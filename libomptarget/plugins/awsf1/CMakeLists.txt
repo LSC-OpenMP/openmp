@@ -20,17 +20,21 @@ if(LIBOMPTARGET_DEP_XILINX_SDX_FOUND)
   add_definitions(-DTARGET_NAME=AWSF1)
 
   # Xilinx
-
-  if (NOT "$ENV{SDX_PLATFORM}" STREQUAL "")
-    set(EnvironmentVariableName "$ENV{SDX_PLATFORM}" CACHE INTERNAL xilinx_aws-vu9p-f1_dynamic_5_0)
+ 
+  message(STATUS "the before value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
+  if (NOT DEFINED ENV{SDX_PLATFORM})
+    set(ENV{SDX_PLATFORM} "xilinx_aws-vu9p-f1_dynamic_5_0")
   endif()
-
+  message(STATUS "the after value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
+    
   add_definitions(-DSDX_PLATFORM=$ENV{SDX_PLATFORM})
   add_definitions(-D__USE_XOPEN2K8)
 
   if(LIBOMPTARGET_CMAKE_BUILD_TYPE MATCHES debug)
     add_definitions(-DAWSF1_ERROR_REPORT)
   endif()
+ 
+  message(STATUS "the value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
 
   include_directories(${LIBOMPTARGET_DEP_LIBELF_INCLUDE_DIRS})
   include_directories(${LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIRS})
@@ -39,6 +43,7 @@ if(LIBOMPTARGET_DEP_XILINX_SDX_FOUND)
 
   add_library(omptarget.rtl.awsf1 SHARED
               src/util/awsf1_generic_app.cpp
+              src/util/utils.cpp
               src/rtl.cpp)
 
   # Install plugin under the lib destination folder.

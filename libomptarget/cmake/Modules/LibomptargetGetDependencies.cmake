@@ -27,7 +27,8 @@
 # boost program_options : required by OPAE
 # JSON-C : required by OPAE
 
-# Xilinx AWS F1
+
+# Xilinx AWS F1 
 
 include (FindPackageHandleStandardArgs)
 include (FindUUID)
@@ -450,7 +451,7 @@ find_library (
     ENV LIBRARY_PATH
     ENV LD_LIBRARY_PATH)
 
-find_library (
+find_library ( 
     LIBOMPTARGET_DEP_XILINX_SDX_XILINXOPENCL_LIBRARY
   NAMES
     xilinxopencl

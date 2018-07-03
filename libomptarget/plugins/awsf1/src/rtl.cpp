@@ -177,6 +177,7 @@ int32_t __tgt_rtl_number_of_devices() {
 int32_t __tgt_rtl_init_device(int32_t device_id) {
 
   DP("[awsf1] __tgt_rtl_init_device\n");
+  awsf1_generic_app.init();
 
   return OFFLOAD_SUCCESS;
 }
@@ -328,7 +329,9 @@ int32_t __tgt_rtl_data_submit(int32_t device_id, void *tgt_ptr, void *hst_ptr,
   DP("[awsf1] __tgt_rtl_data_submit\n");
 
   TIME_START
-  memcpy(tgt_ptr, hst_ptr, size);
+
+  awsf1_generic_app.submit_buffer(tgt_ptr, hst_ptr, size);
+
   TIME_PRINT("submit")
 
   return OFFLOAD_SUCCESS;
@@ -340,7 +343,7 @@ int32_t __tgt_rtl_data_retrieve(int32_t device_id, void *hst_ptr, void *tgt_ptr,
   DP("[awsf1] __tgt_rtl_data_retrieve\n");
 
   TIME_START
-  memcpy(hst_ptr, tgt_ptr, size);
+  awsf1_generic_app.retrieve_buffer(    hst_ptr, tgt_ptr, size);
   TIME_PRINT("retrieve")
 
   return OFFLOAD_SUCCESS;
@@ -351,7 +354,7 @@ int32_t __tgt_rtl_data_delete(int32_t device_id, void *tgt_ptr) {
   DP("[awsf1] __tgt_rtl_delete\n");
 
   TIME_START
-  awsf1_generic_app.delete_buffer(tgt_ptr);
+  // awsf1_generic_app.delete_buffer(tgt_ptr);
   TIME_PRINT("delete")
 
   return OFFLOAD_SUCCESS;
@@ -382,4 +385,3 @@ int32_t __tgt_rtl_run_target_region(int32_t device_id, void *tgt_entry_ptr,
 #ifdef __cplusplus
 }
 #endif
-
