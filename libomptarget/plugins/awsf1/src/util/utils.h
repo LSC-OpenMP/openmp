@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <CL/opencl.h>
+#include <vector>
 
 #define NUM_WORKGROUPS (1)
 #define WORKGROUP_SIZE (256)

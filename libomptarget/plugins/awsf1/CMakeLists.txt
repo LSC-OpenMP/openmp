@@ -23,7 +23,7 @@ if(LIBOMPTARGET_DEP_XILINX_SDX_FOUND)
  
   message(STATUS "the before value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
   if (NOT DEFINED ENV{SDX_PLATFORM})
-    set(ENV{SDX_PLATFORM} "xilinx_aws-vu9p-f1_dynamic_5_0")
+    set(ENV{SDX_PLATFORM} "xilinx_aws-vu9p-f1-04261818_dynamic_5_0")
   endif()
   message(STATUS "the after value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
     

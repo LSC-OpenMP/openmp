@@ -23,6 +23,10 @@ char target_device_name[1001] = TARGET_DEVICE;
 cl_mem d_axi00_ptr0;
 int KernelArgCount = 0;
 
+std::vector<cl_uint> scalars_values; // buffers sizes
+std::vector<cl_mem> clmem_ptrs; // buffers pointers
+
+
 
 int load_file_to_memory(const char *filename, char **result)
 {
@@ -177,7 +181,7 @@ void init_util()
 
 	    // Create the compute kernel in the program we wish to run
 	    //
-	     kernel = clCreateKernel(program, "sdx_kernel_wizard_0", &err);
+	     kernel = clCreateKernel(program, "image_filters", &err);
 	    if (!kernel || err != CL_SUCCESS) {
 	        printf("Error: Failed to create compute kernel!\n");
 	        printf("Test failed\n");
@@ -185,29 +189,20 @@ void init_util()
 	    }
 
 }
-cl_mem dteste;
+
 void* data_alloc(int size)
 {
 	cl_mem dt = clCreateBuffer(context,  CL_MEM_READ_WRITE,  size, NULL, NULL);
-  dteste = dt;
 	 if (!(dt)) {
-		 printf("Error: Failed to allocate device memory!\n");
-	     printf("Test failed\n");
+		printf("Error: Failed to allocate device memory!\n");
+	     	printf("Test failed\n");
 	  //   return EXIT_FAILURE;
 	 }
-
-	 err = 0;
-
-	 err = clSetKernelArg(kernel, KernelArgCount, sizeof(cl_mem), &dt); // Not used in example RTL logic.*/
-
-	 KernelArgCount++;
-	 if (err != CL_SUCCESS) {
-		 printf("Error: Failed to set kernel arguments! %d\n", err);
-		 printf("Test failed\n");
-		 //   return EXIT_FAILURE;
-		}
-
-	 return (void*) dt;
+	
+	clmem_ptrs.push_back(dt);
+	scalars_values.push_back((cl_uint)size);
+	
+	return (void*) dt;
 }
 
 void data_submit(void *tgt_ptr, void *hst_ptr, int64_t size)
@@ -224,13 +219,35 @@ void data_submit(void *tgt_ptr, void *hst_ptr, int64_t size)
 
 void run_target()
 {
+	err = 0;
+	int args_c = 0;  // contador de argumentos
+	
+	for(auto scl: scalars_values){
+		err = clSetKernelArg(kernel, args_c, sizeof(cl_uint),&scl);
+		if(err != CL_SUCCESS){
+			printf("Error: Failed to set kernel arguments! %d\n", err);
+			printf("Test failed\n");
+		}
+		args_c++;
+	}	
+	
+	for(auto ptrs: clmem_ptrs){
+		err = clSetKernelArg(kernel, args_c, sizeof(cl_mem), &ptrs);
+		if(err != CL_SUCCESS){
+			printf("Error: Failed to set kernel arguments! %d\n", err);
+			printf("Test failed\n");
+		}
+		args_c++;
+	}
+
+
 	// Execute the kernel over the entire range of our 1d input data set
 	// using the maximum number of work group items for this device
-  clFinish(commands);
+  	clFinish(commands);
 	err = clEnqueueTask(commands, kernel, 0, NULL, NULL);
 	if (err) {
 		printf("Error: Failed to execute kernel! %d\n", err);
-	    printf("Test failed\n");
+	   	printf("Test failed\n");
 	 //   return EXIT_FAILURE;
 	}
 }
@@ -242,7 +259,6 @@ void data_retrieve(void *hst_ptr, void *tgt_ptr, int size)
 
 	err = 0;
 	err |= clEnqueueReadBuffer( commands, (cl_mem )tgt_ptr, CL_TRUE, 0, size, hst_ptr, 0, NULL, &readevent );
-
 
 	if (err != CL_SUCCESS) {
 		printf("Error: Failed to read output array! %d\n", err);

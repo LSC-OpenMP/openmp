@@ -24,7 +24,7 @@ AWSF1GenericApp::AWSF1GenericApp() {}
 AWSF1GenericApp::~AWSF1GenericApp() {}
 
 int AWSF1GenericApp::init() {
-  //  xclbin = "binary_container_1.xclbin";
+  
   init_util();
   return 0;
 }
@@ -62,53 +62,9 @@ int AWSF1GenericApp::program(const char *module) {
 
 int AWSF1GenericApp::run() {
 
-    // device memory used for a vector
-
-
-   // if (argc != 2) {
-   //     printf("Usage: %s xclbin\n", argv[0]);
-   //     return EXIT_FAILURE;
-   // }
-
-   // xclbin = argv[1];
-
-
-
-
-
-    // Create the input and output arrays in device memory for our calculation
-
-
-//    d_axi00_ptr0 = (cl_mem)data_alloc(number_of_words);
-
-
-    // Write our data set into the input array in device memory
-    //
-
-  //  data_submit(d_axi00_ptr0, h_axi00_ptr0_input,sizeof(int) * number_of_words);
-
-
-    // Set the arguments to our compute kernel
-    // int vector_length = MAX_LENGTH;
 
     run_target();
 
-    // Read back the results from the device to verify the output
-    //
-
-  //  data_retrieve(h_axi00_ptr0_output, d_axi00_ptr0,sizeof(int) * number_of_words);
-
-//    for (uint i = 0; i < number_of_words; i++) {
-  //  	if ((h_axi00_ptr0_input[i] + 1) != h_axi00_ptr0_output[i]) {
-  //  		printf("ERROR in sdx_kernel_wizard_0 - array index %d (host addr 0x%03x) - input=%d (0x%x), output=%d (0x%x)\n", i, i*4, h_axi00_ptr0_input[i], h_axi00_ptr0_input[i], h_axi00_ptr0_output[i], h_axi00_ptr0_output[i]);
-  //  	    check_status = 1;
-  //  	}
-    	      //  printf("i=%d, input=%d, output=%d\n", i,  h_axi00_ptr0_input[i], h_axi00_ptr0_output[i]);
-  //  }
-
-    //--------------------------------------------------------------------------
-    // Shutdown and cleanup
-    //--------------------------------------------------------------------------
 
     return 0;
 }
