@@ -16,6 +16,17 @@
 #include <stdio.h>
 #include <string.h>
 
+jbyteArray __jni_NewByteArray(JNIEnv *env, jsize size) {
+  jbyteArray array = (*env)->NewByteArray(env, size);
+  if ((*env)->ExceptionCheck(env) == JNI_TRUE) {
+    fprintf(stderr,
+            "omptarget-jni: Failed to call __jni_NewByteArrayElements!\n");
+    return NULL;
+  }
+  // fprintf(stderr, "Run __jni_NewByteArrayElements\n");
+  return array;
+}
+
 void __jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray array,
                                     jbyte *carray, jint mode) {
   (*env)->ReleaseByteArrayElements(env, array, carray, mode);
@@ -38,6 +49,17 @@ void *__jni_GetByteArrayElements(JNIEnv *env, jbyteArray array,
   }
   // fprintf(stderr, "Run __jni_GetPrimitiveArrayCritical\n");
   return carray;
+}
+
+void __jni_SetByteArrayRegion(JNIEnv *env, jbyteArray array, jsize start,
+                              jsize len, const jbyte *buf) {
+  (*env)->SetByteArrayRegion(env, array, start, len, buf);
+  if ((*env)->ExceptionCheck(env) == JNI_TRUE) {
+    fprintf(stderr,
+            "omptarget-jni: Failed to call __jni_SetByteArrayRegion!\n");
+    return;
+  }
+  // fprintf(stderr, "Run __jni_SetByteArrayRegion\n");
 }
 
 void __jni_ReleasePrimitiveArrayCritical(JNIEnv *env, jarray array,
@@ -65,7 +87,6 @@ void *__jni_GetPrimitiveArrayCritical(JNIEnv *env, jarray array,
 }
 
 jobject __jni_CreateNewTuple(JNIEnv *env, jint size, jbyteArray *arrays) {
-
   if (size > 22) {
     fprintf(stderr, "omptarget-jni: Failed to call __jni_CreateNewTuple: the "
                     "size is too big!\n");

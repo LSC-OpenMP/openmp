@@ -21,6 +21,8 @@ extern "C" {
 
 #include <jni.h>
 
+jbyteArray __jni_NewByteArray(JNIEnv *env, jsize size);
+
 void __jni_ReleasePrimitiveArrayCritical(JNIEnv *env, jarray array,
                                          void *carray, jint mode);
 void *__jni_GetPrimitiveArrayCritical(JNIEnv *env, jarray array,
@@ -29,6 +31,8 @@ void __jni_ReleaseByteArrayElements(JNIEnv *env, jbyteArray array,
                                     jbyte *carray, jint mode);
 void *__jni_GetByteArrayElements(JNIEnv *env, jbyteArray array,
                                  jboolean *isCopy);
+void __jni_SetByteArrayRegion(JNIEnv *env, jbyteArray array, jsize start,
+                              jsize len, const jbyte *buf);
 jobject __jni_CreateNewTuple(JNIEnv *env, jint size, jbyteArray *arrays);
 
 #ifdef __cplusplus
