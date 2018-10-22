@@ -28,6 +28,7 @@
 #include "counter_group.h"
 #include "debug.h" // debug
 #include "interface.h" // interfaces with omp, compiler, and user
+#include "state-queue.h"
 #include "support.h"
 
 #define OMPTARGET_NVPTX_VERSION 1.1
@@ -44,20 +45,33 @@
 #define BARRIER_COUNTER 0
 #define ORDERED_COUNTER 1
 
+// Macros for Cuda intrinsics
+// In Cuda 9.0, the *_sync() version takes an extra argument 'mask'.
+// Also, __ballot(1) in Cuda 8.0 is replaced with __activemask().
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 9000
+#define __SHFL_SYNC(mask, var, srcLane) __shfl_sync((mask), (var), (srcLane))
+#define __SHFL_DOWN_SYNC(mask, var, delta, width) \
+                        __shfl_down_sync((mask), (var), (delta), (width))
+#define __BALLOT_SYNC(mask, predicate) __ballot_sync((mask), (predicate))
+#define __ACTIVEMASK() __activemask()
+#else
+#define __SHFL_SYNC(mask, var, srcLane) __shfl((var), (srcLane))
+#define __SHFL_DOWN_SYNC(mask, var, delta, width) __shfl_down((var), (delta), (width))
+#define __BALLOT_SYNC(mask, predicate) __ballot((predicate))
+#define __ACTIVEMASK() __ballot(1)
+#endif
+
 // Data sharing related quantities, need to match what is used in the compiler.
 enum DATA_SHARING_SIZES {
   // The maximum number of workers in a kernel.
   DS_Max_Worker_Threads = 992,
   // The size reserved for data in a shared memory slot.
   DS_Slot_Size = 256,
-  // The maximum number of threads in a worker warp.
-  DS_Max_Worker_Warp_Size = 32,
   // The number of bits required to represent the maximum number of threads in a
   // warp.
-  DS_Max_Worker_Warp_Size_Log2 = 5,
-  DS_Max_Worker_Warp_Size_Log2_Mask = (~0u >> (32-DS_Max_Worker_Warp_Size_Log2)),
+  DS_Max_Worker_Warp_Size_Bits = 5,
   // The slot size that should be reserved for a working warp.
-  DS_Worker_Warp_Slot_Size = DS_Max_Worker_Warp_Size * DS_Slot_Size,
+  DS_Worker_Warp_Slot_Size = WARPSIZE * DS_Slot_Size,
   // The maximum number of warps in use
   DS_Max_Warp_Number = 32,
 };
@@ -98,11 +112,18 @@ public:
   INLINE void ClearDynamic() {
     data.items.flags = data.items.flags & (~TaskDescr_IsDynamic);
   }
+  INLINE void SetFullWarpSimd() {
+    data.items.flags = data.items.flags | TaskDescr_FullWarpSimd;
+  }
+  INLINE void ClearFullWarpSimd() {
+    data.items.flags = data.items.flags & (~TaskDescr_FullWarpSimd);
+  }
   INLINE int InParallelRegion() { return data.items.flags & TaskDescr_InPar; }
   INLINE int InL2OrHigherParallelRegion() { return data.items.flags & TaskDescr_InParL2P; }
   INLINE int IsParallelConstruct() {
     return data.items.flags & TaskDescr_IsParConstr;
   }
+  INLINE int IsFullWarpSimd() { return data.items.flags & TaskDescr_FullWarpSimd; }
   INLINE int IsTaskConstruct() { return !IsParallelConstruct(); }
   // methods for other fields
   INLINE uint16_t &NThreads() { return data.items.nthreads; }
@@ -140,11 +161,12 @@ private:
   static const uint8_t TaskDescr_InPar = 0x10;
   static const uint8_t TaskDescr_IsParConstr = 0x20;
   static const uint8_t TaskDescr_InParL2P = 0x40;
+  static const uint8_t TaskDescr_FullWarpSimd = 0x80;
 
   union { // both have same size
     uint64_t vect[2];
     struct TaskDescr_items {
-      uint8_t flags; // 6 bit used (see flag above)
+      uint8_t flags; // 8 bits used (see flag above)
       uint8_t unused;
       uint16_t nthreads;         // thread num for subsequent parallel regions
       uint16_t threadlimit;      // thread limit ICV
@@ -200,7 +222,7 @@ public:
 
   INLINE __kmpc_data_sharing_slot *RootS(int wid) {
     // If this is invoked by the master thread of the master warp then intialize it with a smaller slot.
-    if (wid == DS_Max_Worker_Warp_Size - 1){
+    if (wid == WARPSIZE - 1){
       // Initialize the pointer to the end of the slot given the size of the data section. DataEnd is non-inclusive.
       master_rootS[0].DataEnd = &master_rootS[0].Data[0] + DS_Slot_Size;
       // We currently do not have a next slot.
@@ -222,7 +244,7 @@ private:
   omp_lock_t criticalLock;
   uint64_t lastprivateIterBuffer;
 
-  __align__(16) __kmpc_data_sharing_worker_slot_static worker_rootS[DS_Max_Worker_Warp_Size - 1];
+  __align__(16) __kmpc_data_sharing_worker_slot_static worker_rootS[WARPSIZE - 1];
   __align__(16) __kmpc_data_sharing_master_slot_static master_rootS[1];
 };
 
@@ -272,7 +294,12 @@ public:
   }
 
   INLINE void InitThreadPrivateContext(int tid);
-
+  INLINE void SetSourceQueue(uint64_t Src) {
+    SourceQueue = Src;
+  }
+  INLINE uint64_t GetSourceQueue() {
+    return SourceQueue;
+  }
 private:
   // team context for this team
   omptarget_nvptx_TeamDescr teamContext;
@@ -296,6 +323,8 @@ private:
   // state for dispatch with dyn/guided OR static (never use both at a time)
   Counter currEvent_or_nextLowerBound[MAX_THREADS_PER_TEAM];
   Counter eventsNum_or_stride[MAX_THREADS_PER_TEAM];
+  // Queue to which this object must be returned.
+  uint64_t SourceQueue;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
