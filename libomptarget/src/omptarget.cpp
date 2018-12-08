@@ -2325,11 +2325,11 @@ EXTERN kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref,
     return NULL;
   }
 
-  DP("__kmpc_omp_target_task_alloc(...) not yet implemented, returning NULL");
+  DP("__kmpc_omp_target_task_alloc(...) not yet implemented, returning NULL\n");
 //  return Klegacy_TaskAlloc(flag | KLEGACY_TARGET_TASK, sizeOfTaskInclPrivate,
 //    sizeOfSharedTable, sub, device_id, TRUE);
   return __kmpc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
-      sizeof_shareds, task_entry);
+      sizeof_shareds, task_entry, device_id);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

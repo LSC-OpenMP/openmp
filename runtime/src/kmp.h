@@ -3595,7 +3595,7 @@ KMP_EXPORT kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                              kmp_int32 flags,
                                              size_t sizeof_kmp_task_t,
                                              size_t sizeof_shareds,
-                                             kmp_routine_entry_t task_entry);
+                                             kmp_routine_entry_t task_entry, int dev = -1);
 KMP_EXPORT void __kmpc_omp_task_begin_if0(ident_t *loc_ref, kmp_int32 gtid,
                                           kmp_task_t *task);
 KMP_EXPORT void __kmpc_omp_task_complete_if0(ident_t *loc_ref, kmp_int32 gtid,

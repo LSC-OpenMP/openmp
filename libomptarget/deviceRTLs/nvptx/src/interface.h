@@ -421,7 +421,7 @@ EXTERN kmp_TaskDescr *__kmpc_omp_task_alloc(kmp_Indent *loc,
                                             uint32_t global_tid, int32_t flag,
                                             size_t sizeOfTaskInclPrivate,
                                             size_t sizeOfSharedTable,
-                                            kmp_TaskFctPtr sub);
+                                            kmp_TaskFctPtr sub, int id = -1);
 EXTERN int32_t __kmpc_omp_task(kmp_Indent *loc, uint32_t global_tid,
                                kmp_TaskDescr *newLegacyTaskDescr);
 EXTERN int32_t __kmpc_omp_task_with_deps(kmp_Indent *loc, uint32_t global_tid,

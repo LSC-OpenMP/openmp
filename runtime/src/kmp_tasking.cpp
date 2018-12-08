@@ -947,6 +947,12 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                 gtid, loc_ref, *((kmp_int32 *)flags), sizeof_kmp_task_t,
                 sizeof_shareds, task_entry));
 
+  printf("Kmpc -->  __kmp_task_alloc(enter): T#%d loc=%p, flags=(0x%x) "
+                "sizeof_task=%ld sizeof_shared=%ld entry=%p\n",
+                gtid, loc_ref, *((kmp_int32 *)flags), sizeof_kmp_task_t,
+                sizeof_shareds, task_entry);
+
+
   if (parent_task->td_flags.final) {
     if (flags->merged_if0) {
     }
@@ -964,6 +970,10 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
       /* This should only happen if the team is serialized
           setup a task team and propagate it to the thread */
       KMP_DEBUG_ASSERT(team->t.t_serialized);
+
+     printf("Kmpc --> T#%d creating task team in __kmp_task_alloc for proxy task\n",gtid);
+
+
       KA_TRACE(30,
                ("T#%d creating task team in __kmp_task_alloc for proxy task\n",
                 gtid));
@@ -1001,8 +1011,15 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   // Allocate a kmp_taskdata_t block and a kmp_task_t block.
   KA_TRACE(30, ("__kmp_task_alloc: T#%d First malloc size: %ld\n", gtid,
                 shareds_offset));
+  
+  printf("Kmpc -->  __kmp_task_alloc: T#%d First malloc size: %ld\n", gtid,
+                shareds_offset);
+
   KA_TRACE(30, ("__kmp_task_alloc: T#%d Second malloc size: %ld\n", gtid,
                 sizeof_shareds));
+  
+  printf("Kmpc --> __kmp_task_alloc: T#%d Second malloc size: %ld\n", gtid,
+                sizeof_shareds);
 
 // Avoid double allocation here by combining shareds with taskdata
 #if USE_FAST_MEMORY
@@ -1120,6 +1137,9 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 
   KA_TRACE(20, ("__kmp_task_alloc(exit): T#%d created task %p parent=%p\n",
                 gtid, taskdata, taskdata->td_parent));
+  printf("Kmpc --> __kmp_task_alloc(exit): T#%d created task %p parent=%p\n",
+                gtid, taskdata, taskdata->td_parent);
+
   ANNOTATE_HAPPENS_BEFORE(task);
 
 #if OMPT_SUPPORT
@@ -1132,7 +1152,9 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                   kmp_int32 flags, size_t sizeof_kmp_task_t,
                                   size_t sizeof_shareds,
-                                  kmp_routine_entry_t task_entry) {
+                                  kmp_routine_entry_t task_entry, int dev) {
+
+  printf("Kmpc --> Execute task on device %d\n", dev);
   kmp_task_t *retval;
   kmp_tasking_flags_t *input_flags = (kmp_tasking_flags_t *)&flags;
 
@@ -1151,6 +1173,14 @@ kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                 gtid, loc_ref, input_flags->tiedness ? "tied  " : "untied",
                 sizeof_kmp_task_t, sizeof_shareds, task_entry));
 #endif
+ 
+  printf("Kmpc --> __kmpc_omp_task_alloc(enter): T#%d loc=%p, flags=(%s) "
+	"sizeof_task=%ld sizeof_shared=%ld entry=%p\n",
+	gtid, loc_ref, input_flags->tiedness ? "tied  " : "untied",
+                sizeof_kmp_task_t, sizeof_shareds, task_entry);
+
+
+
 
   retval = __kmp_task_alloc(loc_ref, gtid, input_flags, sizeof_kmp_task_t,
                             sizeof_shareds, task_entry);

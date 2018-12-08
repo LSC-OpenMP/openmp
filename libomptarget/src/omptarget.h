@@ -124,7 +124,7 @@ int omp_get_default_device(void) __attribute__((weak));
 kmp_int32 __kmpc_omp_taskwait(ident_t *loc_ref, kmp_int32 gtid) __attribute__((weak));
 kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
     kmp_int32 flags, size_t sizeof_kmp_task_t, size_t sizeof_shareds,
-    kmp_routine_entry_t task_entry) __attribute__((weak));
+    kmp_routine_entry_t task_entry, int dev = -1) __attribute__((weak));
 
 int omp_get_num_devices(void);
 int omp_get_initial_device(void);
