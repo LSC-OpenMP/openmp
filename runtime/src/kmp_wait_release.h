@@ -112,6 +112,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     return;
   }
   th_gtid = this_thr->th.th_info.ds.ds_gtid;
+  printf("__kmp_wait_sleep: T#%d waiting for flag(%p)\n", th_gtid, flag);
   KA_TRACE(20,
            ("__kmp_wait_sleep: T#%d waiting for flag(%p)\n", th_gtid, flag));
 #if KMP_STATS_ENABLED
@@ -145,15 +146,19 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     }
   }
 #endif
-
+ 
+  printf("__kmp_wait_sleep: T#%d Setup for waiting\n", th_gtid);
   // Setup for waiting
   KMP_INIT_YIELD(spins);
 
   if (__kmp_dflt_blocktime != KMP_MAX_BLOCKTIME) {
+  printf("__kmp_wait_sleep: T#%d __kmp_dflt_blocktime != KMP_MAX_BLOCKTIME\n", th_gtid);
 #if KMP_USE_MONITOR
+ printf("__kmp_wait_sleep: T#%d KMP_USE_MONITOR DEFINED\n", th_gtid);
 // The worker threads cannot rely on the team struct existing at this point.
 // Use the bt values cached in the thread struct instead.
 #ifdef KMP_ADJUST_BLOCKTIME
+    printf("__kmp_wait_sleep: T#%d KMP_ADJUST_BLOCKTIME DEFINED\n", th_gtid);
     if (__kmp_zero_bt && !this_thr->th.th_team_bt_set)
       // Force immediate suspend if not set by user and more threads than
       // available procs
@@ -161,8 +166,10 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     else
       hibernate = this_thr->th.th_team_bt_intervals;
 #else
+    printf("__kmp_wait_sleep: T#%d KMP_ADJUST_BLOCKTIME NOT DEFINED\n", th_gtid);
     hibernate = this_thr->th.th_team_bt_intervals;
 #endif /* KMP_ADJUST_BLOCKTIME */
+    printf("__kmp_wait_sleep: T#%d hibernate 1\n", th_gtid);
 
     /* If the blocktime is nonzero, we want to make sure that we spin wait for
        the entirety of the specified #intervals, plus up to one interval more.
@@ -170,13 +177,18 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
        soon.  */
     if (hibernate != 0)
       hibernate++;
+    printf("__kmp_wait_sleep: T#%d hibernate 2\n", th_gtid);
 
     // Add in the current time value.
     hibernate += TCR_4(__kmp_global.g.g_time.dt.t_value);
+    printf("__kmp_wait_sleep: T#%d now=%d, hibernate=%d, intervals=%d\n",
+                  th_gtid, __kmp_global.g.g_time.dt.t_value, hibernate,
+                  hibernate - __kmp_global.g.g_time.dt.t_value);
     KF_TRACE(20, ("__kmp_wait_sleep: T#%d now=%d, hibernate=%d, intervals=%d\n",
                   th_gtid, __kmp_global.g.g_time.dt.t_value, hibernate,
                   hibernate - __kmp_global.g.g_time.dt.t_value));
 #else
+    printf("__kmp_wait_sleep: T#%d KMP_USE_MONITOR NOT DEFINED\n", th_gtid);
     hibernate_goal = KMP_NOW() + this_thr->th.th_team_bt_intervals;
     poll_count = 0;
 #endif // KMP_USE_MONITOR
@@ -187,6 +199,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
 
   // Main wait spin loop
   while (flag->notdone_check()) {
+    //printf("__kmp_wait_sleep: T#%d main wait spin\n", th_gtid);
     int in_pool;
     kmp_task_team_t *task_team = NULL;
     if (__kmp_tasking_mode != tskm_immediate_exec) {
@@ -200,10 +213,12 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
          disabled (KMP_TASKING=0).  */
       if (task_team != NULL) {
         if (TCR_SYNC_4(task_team->tt.tt_active)) {
-          if (KMP_TASKING_ENABLED(task_team))
+          if (KMP_TASKING_ENABLED(task_team)){
+            //printf("__kmp_wait_sleep: T#%d main wait spin before execute_tasks\n", th_gtid);
             flag->execute_tasks(
                 this_thr, th_gtid, final_spin,
                 &tasks_completed USE_ITT_BUILD_ARG(itt_sync_obj), 0);
+	  }
           else
             this_thr->th.th_reap_state = KMP_SAFE_TO_REAP;
         } else {
@@ -238,6 +253,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     in_pool = !!TCR_4(this_thr->th.th_in_pool);
     if (in_pool != !!this_thr->th.th_active_in_pool) {
       if (in_pool) { // Recently transferred from team to pool
+        //printf("__kmp_wait_sleep: T#%d main wait spin recently transferred from team to pool\n", th_gtid);
         KMP_TEST_THEN_INC32(&__kmp_thread_pool_active_nth);
         this_thr->th.th_active_in_pool = TRUE;
         /* Here, we cannot assert that:
@@ -248,6 +264,8 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
            inc/dec'd asynchronously by the workers. The two can get out of sync
            for brief periods of time.  */
       } else { // Recently transferred from pool to team
+        //printf("__kmp_wait_sleep: T#%d main wait spin recently transferred from team to pool\n", th_gtid);
+        KMP_TEST_THEN_INC32(&__kmp_thread_pool_active_nth);
         KMP_TEST_THEN_DEC32(&__kmp_thread_pool_active_nth);
         KMP_DEBUG_ASSERT(TCR_4(__kmp_thread_pool_active_nth) >= 0);
         this_thr->th.th_active_in_pool = FALSE;
@@ -282,6 +300,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
 #endif
 
     KF_TRACE(50, ("__kmp_wait_sleep: T#%d suspend time reached\n", th_gtid));
+    printf("__kmp_wait_sleep: T#%d suspend time reached\n", th_gtid);
     flag->suspend(th_gtid);
 
     if (TCR_4(__kmp_global.g.g_done)) {
@@ -329,7 +348,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     this_thr->th.th_stats->resetIdleFlag();
   }
 #endif
-
+  printf("__kmp_wait_sleep: T#%d returning.\n", th_gtid);
   KMP_FSYNC_SPIN_ACQUIRED(CCAST(typename C::flag_t *, spin));
 }
 
@@ -511,12 +530,14 @@ public:
   int execute_tasks(kmp_info_t *this_thr, kmp_int32 gtid, int final_spin,
                     int *thread_finished USE_ITT_BUILD_ARG(void *itt_sync_obj),
                     kmp_int32 is_constrained) {
+	 // printf("Kmpc --> __ execute_tasks 32\n");
     return __kmp_execute_tasks_32(
         this_thr, gtid, this, final_spin,
         thread_finished USE_ITT_BUILD_ARG(itt_sync_obj), is_constrained);
   }
   void wait(kmp_info_t *this_thr,
             int final_spin USE_ITT_BUILD_ARG(void *itt_sync_obj)) {
+      printf("wait 32\n");
     __kmp_wait_template(this_thr, this,
                         final_spin USE_ITT_BUILD_ARG(itt_sync_obj));
   }
@@ -542,6 +563,7 @@ public:
   }
   void wait(kmp_info_t *this_thr,
             int final_spin USE_ITT_BUILD_ARG(void *itt_sync_obj)) {
+	  printf("kmp_flag_64->wait T#%d\n",this_thr->th.th_info.ds.ds_gtid);
     __kmp_wait_template(this_thr, this,
                         final_spin USE_ITT_BUILD_ARG(itt_sync_obj));
   }
@@ -644,6 +666,7 @@ public:
   bool is_sleeping() { return is_sleeping_val(*get()); }
   bool is_any_sleeping() { return is_sleeping_val(*get()); }
   void wait(kmp_info_t *this_thr, int final_spin) {
+      printf("wait --> oncore");
     __kmp_wait_template<kmp_flag_oncore>(
         this_thr, this, final_spin USE_ITT_BUILD_ARG(itt_sync_obj));
   }

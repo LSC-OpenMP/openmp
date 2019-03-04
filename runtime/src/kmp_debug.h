@@ -22,6 +22,11 @@
 extern "C" {
 #endif // __cplusplus
 
+#ifndef KMP_DEBUG
+#define KMP_DEBUG
+#endif
+
+
 // -----------------------------------------------------------------------------
 // Build-time assertion.
 

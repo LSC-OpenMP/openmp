@@ -119,12 +119,18 @@ typedef struct kmp_task {
   kmp_int32 part_id;
   kmp_cmplrdata_t data1;
   kmp_cmplrdata_t data2;
+
+  // HTASK
+  int isDev;
+  int devId;
+  int flag = 0;
+
 } kmp_task_t;
 int omp_get_default_device(void) __attribute__((weak));
 kmp_int32 __kmpc_omp_taskwait(ident_t *loc_ref, kmp_int32 gtid) __attribute__((weak));
 kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
     kmp_int32 flags, size_t sizeof_kmp_task_t, size_t sizeof_shareds,
-    kmp_routine_entry_t task_entry, int dev = -1) __attribute__((weak));
+    kmp_routine_entry_t task_entry, int isDev = 0, int devId = -1) __attribute__((weak));
 
 int omp_get_num_devices(void);
 int omp_get_initial_device(void);
@@ -216,10 +222,10 @@ void __tgt_target_data_update_nowait_depend(int64_t device_id, int32_t arg_num,
 // target and an int different from zero otherwise.
 int __tgt_target(int64_t device_id, void *host_ptr, int32_t arg_num,
                  void **args_base, void **args, int64_t *arg_sizes,
-                 int64_t *arg_types);
+                 int64_t *arg_types, void *htask);
 int __tgt_target_nowait(int64_t device_id, void *host_ptr, int32_t arg_num,
                         void **args_base, void **args, int64_t *arg_sizes,
-                        int64_t *arg_types);
+                        int64_t *arg_types, void *htask);
 
 int __tgt_target_teams(int64_t device_id, void *host_ptr, int32_t arg_num,
                        void **args_base, void **args, int64_t *arg_sizes,

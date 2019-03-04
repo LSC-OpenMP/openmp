@@ -16,6 +16,7 @@
 
 void __kmp_wait_64(kmp_info_t *this_thr, kmp_flag_64 *flag,
                    int final_spin USE_ITT_BUILD_ARG(void *itt_sync_obj)) {
+  printf("__kmp_wait_64\n");
   __kmp_wait_template(this_thr, flag,
                       final_spin USE_ITT_BUILD_ARG(itt_sync_obj));
 }

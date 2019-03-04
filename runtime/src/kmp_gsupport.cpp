@@ -340,7 +340,7 @@ static void __kmp_GOMP_serialized_parallel(ident_t *loc, kmp_int32 gtid,
     }
   }
 #endif
-
+    printf("__kmp_GOMP_serialized_parallel\n");
   __kmp_serialized_parallel(loc, gtid);
 
 #if OMPT_SUPPORT

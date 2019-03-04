@@ -494,6 +494,7 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
 }
 
 static void *__kmp_launch_worker(void *thr) {
+  printf("__kmp_launch_worker\n");
   int status, old_type, old_state;
 #ifdef KMP_BLOCK_SIGNALS
   sigset_t new_set, old_set;
@@ -557,7 +558,7 @@ static void *__kmp_launch_worker(void *thr) {
   __kmp_set_stack_info(gtid, (kmp_info_t *)thr);
 
   __kmp_check_stack_overlap((kmp_info_t *)thr);
-
+ printf("__kmp_launch_worker before __kmp_launch_thread\n");
   exit_val = __kmp_launch_thread((kmp_info_t *)thr);
 
 #ifdef KMP_BLOCK_SIGNALS
@@ -565,6 +566,7 @@ static void *__kmp_launch_worker(void *thr) {
   KMP_CHECK_SYSFAIL("pthread_sigmask", status);
 #endif /* KMP_BLOCK_SIGNALS */
 
+ printf("__kmp_launch_worker done\n");
   return exit_val;
 }
 
@@ -768,6 +770,7 @@ static void *__kmp_launch_monitor(void *thr) {
 #endif // KMP_USE_MONITOR
 
 void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
+  printf("__kmp_create_worker #%d\n",gtid);
   pthread_t handle;
   pthread_attr_t thread_attr;
   int status;
@@ -795,6 +798,7 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
 
   if (KMP_UBER_GTID(gtid)) {
     KA_TRACE(10, ("__kmp_create_worker: uber thread (%d)\n", gtid));
+    printf("__kmp_create_worker: uber thread (%d)\n", gtid);
     th->th.th_info.ds.ds_thread = pthread_self();
     __kmp_set_stack_info(gtid, th);
     __kmp_check_stack_overlap(th);
@@ -802,6 +806,7 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
   }; // if
 
   KA_TRACE(10, ("__kmp_create_worker: try to create thread (%d)\n", gtid));
+  printf("__kmp_create_worker: try to create thread (%d)\n", gtid);
 
   KMP_MB(); /* Flush all pending memory write invalidates.  */
 
@@ -826,6 +831,9 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
      and also gives the user the stack space they requested for all threads */
   stack_size += gtid * __kmp_stkoffset * 2;
 
+  printf("__kmp_create_worker: T#%d, default stacksize = %lu bytes, "
+                "__kmp_stksize = %lu bytes, final stacksize = %lu bytes\n",
+                gtid, KMP_DEFAULT_STKSIZE, __kmp_stksize, stack_size);
   KA_TRACE(10, ("__kmp_create_worker: T#%d, default stacksize = %lu bytes, "
                 "__kmp_stksize = %lu bytes, final stacksize = %lu bytes\n",
                 gtid, KMP_DEFAULT_STKSIZE, __kmp_stksize, stack_size));
@@ -837,6 +845,10 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
     if (!__kmp_env_stksize) {
       stack_size = KMP_BACKUP_STKSIZE + gtid * __kmp_stkoffset;
       __kmp_stksize = KMP_BACKUP_STKSIZE;
+      printf("__kmp_create_worker: T#%d, default stacksize = %lu bytes, "
+                    "__kmp_stksize = %lu bytes, (backup) final stacksize = %lu "
+                    "bytes\n",
+                    gtid, KMP_DEFAULT_STKSIZE, __kmp_stksize, stack_size);
       KA_TRACE(10, ("__kmp_create_worker: T#%d, default stacksize = %lu bytes, "
                     "__kmp_stksize = %lu bytes, (backup) final stacksize = %lu "
                     "bytes\n",
@@ -892,6 +904,7 @@ void __kmp_create_worker(int gtid, kmp_info_t *th, size_t stack_size) {
   KMP_MB(); /* Flush all pending memory write invalidates.  */
 
   KA_TRACE(10, ("__kmp_create_worker: done creating thread (%d)\n", gtid));
+  printf("__kmp_create_worker: done creating thread (%d)\n", gtid);
 
 } // __kmp_create_worker
 

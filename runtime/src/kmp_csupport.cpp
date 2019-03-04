@@ -97,6 +97,7 @@ kmp_int32 __kmpc_global_thread_num(ident_t *loc) {
   kmp_int32 gtid = __kmp_entry_gtid();
 
   KC_TRACE(10, ("__kmpc_global_thread_num: T#%d\n", gtid));
+  printf("__kmpc_global_thread_num: T#%d\n", gtid);
 
   return gtid;
 }
@@ -262,9 +263,11 @@ construct
 Do the actual fork and call the microtask in the relevant number of threads.
 */
 void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
+  printf("Kmpc --> kmpc_fork_call entering\n");
   int gtid = __kmp_entry_gtid();
 
 #if (KMP_STATS_ENABLED)
+  printf("Kmpc --> kmpc_fork_call KMP_STATS_ENABLED\n");
   int inParallel = __kmpc_in_parallel(loc);
   if (inParallel) {
     KMP_COUNT_BLOCK(OMP_NESTED_PARALLEL);
@@ -279,6 +282,7 @@ void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
     va_start(ap, microtask);
 
 #if OMPT_SUPPORT
+  printf("Kmpc --> kmpc_fork_call OMPT_SUPPORT\n");
     ompt_frame_t *ompt_frame;
     if (ompt_enabled) {
       kmp_info_t *master_th = __kmp_threads[gtid];
@@ -323,6 +327,7 @@ void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
 
     va_end(ap);
   }
+  printf("Kmpc --> kmpc_fork_call exiting\n");
 }
 
 #if OMP_40_ENABLED
@@ -438,6 +443,7 @@ void __kmpc_serialized_parallel(ident_t *loc, kmp_int32 global_tid) {
   // The implementation is now in kmp_runtime.cpp so that it can share static
   // functions with kmp_fork_call since the tasks to be done are similar in
   // each case.
+  printf("__kmpc_serialized_parallel\n");
   __kmp_serialized_parallel(loc, global_tid);
 }
 
@@ -1437,6 +1443,7 @@ should introduce an explicit barrier if it is required.
 */
 
 kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid) {
+	printf("__kmpc_single enter T#%d\n", global_tid);
   kmp_int32 rc = __kmp_enter_single(global_tid, loc, TRUE);
 
   if (rc) {
@@ -1468,7 +1475,7 @@ kmp_int32 __kmpc_single(ident_t *loc, kmp_int32 global_tid) {
     }
   }
 #endif
-
+  printf("__kmpc_single exiting T#%d\n", global_tid);
   return rc;
 }
 
