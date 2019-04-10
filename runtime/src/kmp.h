@@ -3727,6 +3727,9 @@ KMP_EXPORT kmp_uint64 __kmpc_get_parent_taskid();
 // C++ port
 // missing 'extern "C"' declarations
 
+
+KMP_EXPORT void __tgt_preoffload(void) __attribute__((weak));
+
 KMP_EXPORT kmp_int32 __kmpc_in_parallel(ident_t *loc);
 KMP_EXPORT void __kmpc_pop_num_threads(ident_t *loc, kmp_int32 global_tid);
 KMP_EXPORT void __kmpc_push_num_threads(ident_t *loc, kmp_int32 global_tid,

@@ -263,11 +263,11 @@ construct
 Do the actual fork and call the microtask in the relevant number of threads.
 */
 void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
-  //printf("Kmpc --> kmpc_fork_call entering\n");
+  printf("Kmpc --> kmpc_fork_call entering\n");
   int gtid = __kmp_entry_gtid();
 
 #if (KMP_STATS_ENABLED)
-  //printf("Kmpc --> kmpc_fork_call KMP_STATS_ENABLED\n");
+  printf("Kmpc --> kmpc_fork_call KMP_STATS_ENABLED\n");
   int inParallel = __kmpc_in_parallel(loc);
   if (inParallel) {
     KMP_COUNT_BLOCK(OMP_NESTED_PARALLEL);
@@ -282,7 +282,7 @@ void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
     va_start(ap, microtask);
 
 #if OMPT_SUPPORT
-  //printf("Kmpc --> kmpc_fork_call OMPT_SUPPORT\n");
+  printf("Kmpc --> kmpc_fork_call OMPT_SUPPORT\n");
     ompt_frame_t *ompt_frame;
     if (ompt_enabled) {
       kmp_info_t *master_th = __kmp_threads[gtid];
@@ -327,7 +327,7 @@ void __kmpc_fork_call(ident_t *loc, kmp_int32 argc, kmpc_micro microtask, ...) {
 
     va_end(ap);
   }
-  //printf("Kmpc --> kmpc_fork_call exiting\n");
+  printf("Kmpc --> kmpc_fork_call exiting\n");
 }
 
 #if OMP_40_ENABLED
@@ -638,12 +638,17 @@ Execute a barrier.
 void __kmpc_barrier(ident_t *loc, kmp_int32 global_tid) {
   KMP_COUNT_BLOCK(OMP_BARRIER);
   KC_TRACE(10, ("__kmpc_barrier: called T#%d\n", global_tid));
+  printf("__kmpc_barrier: called T#%d\n", global_tid);
 
-  if (!TCR_4(__kmp_init_parallel))
-    __kmp_parallel_initialize();
+  if (!TCR_4(__kmp_init_parallel)){
+        printf("__kmpc_barrier: called T#%d -- __kmp_init_parallel\n", global_tid);
+        __kmp_parallel_initialize();
+    }
 
   if (__kmp_env_consistency_check) {
+        printf("__kmpc_barrier: called T#%d -- __kmp_env_consistency_check\n", global_tid);
     if (loc == 0) {
+        printf("__kmpc_barrier: called T#%d -- __kmp_env_consistency_check -- loc\n", global_tid);
       KMP_WARNING(ConstructIdentInvalid); // ??? What does it mean for the user?
     }; // if
 
@@ -3365,4 +3370,4 @@ void __kmpc_reduce_conditional_lastprivate(ident_t *loc, kmp_int32 global_tid,
 }
 #endif
 
-// end of file //
+

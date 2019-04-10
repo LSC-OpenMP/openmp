@@ -19,6 +19,7 @@
 #include "kmp_io.h"
 #include "kmp_wait_release.h"
 
+
 #if OMP_40_ENABLED
 
 // TODO: Improve memory allocation? keep a list of pre-allocated structures?
@@ -242,9 +243,9 @@ __kmp_process_deps(kmp_int32 gtid, kmp_depnode_t *node, kmp_dephash_t *hash,
                    bool dep_barrier, kmp_int32 ndeps,
 		   kmp_depend_info_t *dep_list, kmp_task_t *task){
 
-  //printf("__kmp_process_deps<%d>: T#%d processing %d dependencies : "
-//                "dep_barrier = %d\n",
- //               filter, gtid, ndeps, dep_barrier);
+  printf("__kmp_process_deps<%d>: T#%d processing %d dependencies : "
+                "dep_barrier = %d\n",
+                filter, gtid, ndeps, dep_barrier);
   KA_TRACE(30, ("__kmp_process_deps<%d>: T#%d processing %d dependencies : "
                 "dep_barrier = %d\n",
                 filter, gtid, ndeps, dep_barrier));
@@ -272,10 +273,10 @@ __kmp_process_deps(kmp_int32 gtid, kmp_depnode_t *node, kmp_dephash_t *hash,
             __kmp_track_dependence(indep, node, task);
             indep->dn.successors =
                 __kmp_add_node(thread, indep->dn.successors, node);
-            //printf("__kmp_process_deps<%d> first: T#%d adding dependence from "
-             //             "%p to %p\n",
-             //             filter, gtid, KMP_TASK_TO_TASKDATA(indep->dn.task),
-             //             KMP_TASK_TO_TASKDATA(task));
+            printf("__kmp_process_deps<%d> first: T#%d adding dependence from "
+                          "%p to %p\n",
+                          filter, gtid, KMP_TASK_TO_TASKDATA(indep->dn.task),
+                          KMP_TASK_TO_TASKDATA(task));
             KA_TRACE(40, ("__kmp_process_deps<%d>: T#%d adding dependence from "
                           "%p to %p\n",
                           filter, gtid, KMP_TASK_TO_TASKDATA(indep->dn.task),
@@ -299,9 +300,9 @@ __kmp_process_deps(kmp_int32 gtid, kmp_depnode_t *node, kmp_dephash_t *hash,
 
 	     printf("\n\n DEP: %x \n\n", dep->base_addr);
 
-        //printf("__kmp_process_deps<%d> second: T#%d adding dependence from %p to %p flag=%d\n",
-          //   filter, gtid, KMP_TASK_TO_TASKDATA(last_out->dn.task),
-          //   KMP_TASK_TO_TASKDATA(task),last_out->dn.task->flag);
+        printf("__kmp_process_deps<%d> second: T#%d adding dependence from %p to %p flag=%d\n",
+             filter, gtid, KMP_TASK_TO_TASKDATA(last_out->dn.task),
+             KMP_TASK_TO_TASKDATA(task),last_out->dn.task->flag);
         KA_TRACE(
             40,
             ("__kmp_process_deps<%d>: T#%d adding dependence from %p to %p\n",
@@ -314,12 +315,15 @@ __kmp_process_deps(kmp_int32 gtid, kmp_depnode_t *node, kmp_dephash_t *hash,
     }
 
     if (dep_barrier) {
+      printf("__kmp_process_deps deb_barrier\n");
+      // if this is a sync point in the serial sequence, then the previous
       // if this is a sync point in the serial sequence, then the previous
       // outputs are guaranteed to be completed after
       // the execution of this task so the previous output nodes can be cleared.
       __kmp_node_deref(thread, last_out);
       info->last_out = NULL;
     } else {
+      printf("__kmp_process_deps deb_barrier ELSE\n");
       if (dep->flags.out) {
         __kmp_node_deref(thread, last_out);
         info->last_out = __kmp_node_ref(node);
@@ -351,10 +355,10 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
 #if KMP_DEBUG
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
 #endif
- // printf("__kmp_check_deps: T#%d checking dependencies for task %p : %d "
-//                "possibly aliased dependencies, %d non-aliased depedencies : "
-  //              "dep_barrier=%d .\n",
-  //              gtid, taskdata, ndeps, ndeps_noalias, dep_barrier);
+  printf("__kmp_check_deps: T#%d checking dependencies for task %p : %d "
+                "possibly aliased dependencies, %d non-aliased depedencies : "
+                "dep_barrier=%d .\n",
+                gtid, taskdata, ndeps, ndeps_noalias, dep_barrier);
 
   KA_TRACE(20, ("__kmp_check_deps: T#%d checking dependencies for task %p : %d "
                 "possibly aliased dependencies, %d non-aliased depedencies : "
@@ -401,8 +405,8 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
       KMP_TEST_THEN_ADD32(CCAST(kmp_int32 *, &node->dn.npredecessors),
                           npredecessors) +
       npredecessors;
-  //printf("__kmp_check_deps: T#%d found %d predecessors for task %p \n",
-  //              gtid, npredecessors, taskdata);
+  printf("__kmp_check_deps: T#%d found %d predecessors for task %p \n",
+                gtid, npredecessors, taskdata);
 
   KA_TRACE(20, ("__kmp_check_deps: T#%d found %d predecessors for task %p \n",
                 gtid, npredecessors, taskdata));
@@ -417,8 +421,8 @@ void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   kmp_depnode_t *node = task->td_depnode;
 
   if (task->td_dephash) {
-    //printf("__kmp_release_deps: T#%d freeing dependencies hash of task %p.\n",
-   //          gtid, task);
+    printf("__kmp_release_deps: T#%d freeing dependencies hash of task %p.\n",
+             gtid, task);
     KA_TRACE(
         40, ("__kmp_release_deps: T#%d freeing dependencies hash of task %p.\n",
              gtid, task));
@@ -429,8 +433,8 @@ void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   if (!node)
     return;
 
- // printf("__kmp_release_deps: T#%d notifying successors of task %p.\n",
-//                gtid, task);
+  printf("__kmp_release_deps: T#%d notifying successors of task %p.\n",
+                gtid, task);
 
   KA_TRACE(20, ("__kmp_release_deps: T#%d notifying successors of task %p.\n",
                 gtid, task));
@@ -451,13 +455,14 @@ void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
     if (npredecessors == 0) {
       KMP_MB();
       if (successor->dn.task) {
-        //printf("__kmp_release_deps: T#%d successor %p of %p scheduled "
-          //            "for execution.\n",
-          //            gtid, successor->dn.task, task);
+        printf("__kmp_release_deps: T#%d successor %p of %p scheduled "
+                      "for execution.\n",
+                      gtid, successor->dn.task, task);
         KA_TRACE(20, ("__kmp_release_deps: T#%d successor %p of %p scheduled "
                       "for execution.\n",
                       gtid, successor->dn.task, task));
-//	printf("kmp_omp_release_deps calling __kmp_omp_task\n");
+	printf("kmp_omp_release_deps calling __kmp_omp_task\n");
+        __tgt_preoffload();
         __kmp_omp_task(gtid, successor->dn.task, false);
       }
     }
@@ -473,8 +478,8 @@ void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
 
   __kmp_node_deref(thread, node);
 
-  //printf("__kmp_release_deps: T#%d all successors of %p notified of completion\n",
- //      gtid, task);
+  printf("__kmp_release_deps: T#%d all successors of %p notified of completion\n",
+       gtid, task);
   KA_TRACE(
       20,
       ("__kmp_release_deps: T#%d all successors of %p notified of completion\n",
@@ -503,9 +508,9 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
                                     kmp_int32 ndeps_noalias,
                                     kmp_depend_info_t *noalias_dep_list) {
 
-  //printf("Kmpc --> __kmpc_omp_task_with_deps says: isDev: %d / devId: %d / ndeps %d / ndeps_noalias %d\n", new_task->isDev, new_task->devId, ndeps, ndeps_noalias);
+  printf("Kmpc --> __kmpc_omp_task_with_deps says: isDev: %d / devId: %d / ndeps %d / ndeps_noalias %d\n", new_task->isDev, new_task->devId, ndeps, ndeps_noalias);
   kmp_taskdata_t *new_taskdata = KMP_TASK_TO_TASKDATA(new_task);
-  //printf("kmpc --> __kmpc_omp_task_with_deps(enter): T#%d loc=%p task=%p\n", gtid,loc_ref, new_taskdata);
+      printf("kmpc --> __kmpc_omp_task_with_deps(enter): T#%d loc=%p task=%p\n", gtid,loc_ref, new_taskdata);
   KA_TRACE(10, ("__kmpc_omp_task_with_deps(enter): T#%d loc=%p task=%p\n", gtid,
                 loc_ref, new_taskdata));
   kmp_info_t *thread = __kmp_threads[gtid];
@@ -565,10 +570,10 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
   kmp_task_team_t *task_team = thread->th.th_task_team;
   serial = serial && !(task_team && task_team->tt.tt_found_proxy_tasks);
 #endif
-
+  printf("__kmpc_omp_task_with_deps !serial = %d, ndeps = %d, ndeps_noalias=%d", !serial, ndeps, ndeps_noalias);
   if (!serial && (ndeps > 0 || ndeps_noalias > 0)) {
     /* if no dependencies have been tracked yet, create the dependence hash */
-	  //printf("Kmpc --> __kmpc_omp_task_with_deps says: if no dependencies have been tracked yet, create the dependence hash\n");
+	  printf("Kmpc --> __kmpc_omp_task_with_deps says: if no dependencies have been tracked yet, create the dependence hash\n");
     if (current_task->td_dephash == NULL)
       current_task->td_dephash = __kmp_dephash_create(thread, current_task);
 
@@ -586,10 +591,10 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
     if (__kmp_check_deps(gtid, node, new_task, current_task->td_dephash,
                          NO_DEP_BARRIER, ndeps, dep_list, ndeps_noalias,
                          noalias_dep_list)) {
-      //printf("Kmpc --> __kmpc_omp_task_with_deps(exit): T#%d task had blocking "
-     //               "dependencies: "
-     //               "loc=%p task=%p, return: TASK_CURRENT_NOT_QUEUED\n",
-     //               gtid, loc_ref, new_taskdata);
+      printf("Kmpc --> __kmpc_omp_task_with_deps(exit): T#%d task had blocking "
+                    "dependencies: "
+                    "loc=%p task=%p, return: TASK_CURRENT_NOT_QUEUED\n",
+                    gtid, loc_ref, new_taskdata);
 
       KA_TRACE(10, ("__kmpc_omp_task_with_deps(exit): T#%d task had blocking "
                     "dependencies: "
@@ -598,19 +603,19 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
       return TASK_CURRENT_NOT_QUEUED;
     }
   } else {
-    //printf("Kmpc --> __kmpc_omp_task_with_deps(exit): T#%d ignored dependencies "
-   //               "for task (serialized)"
-   //               "loc=%p task=%p\n",
-   //               gtid, loc_ref, new_taskdata);
+    printf("Kmpc --> __kmpc_omp_task_with_deps(exit): T#%d ignored dependencies "
+                  "for task (serialized)"
+                  "loc=%p task=%p\n",
+                  gtid, loc_ref, new_taskdata);
     KA_TRACE(10, ("__kmpc_omp_task_with_deps(exit): T#%d ignored dependencies "
                   "for task (serialized)"
                   "loc=%p task=%p\n",
                   gtid, loc_ref, new_taskdata));
   }
-  //printf("Kmpc --> __kmpc_omp_task_with_deps(exit): T#%d task had no blocking "
-  //               "dependencies : "
-  //              "loc=%p task=%p, transferring to __kmpc_omp_task\n",
-  //              gtid, loc_ref, new_taskdata);
+  printf("Kmpc --> __kmpc_omp_task_with_deps(exit): T#%d task had no blocking "
+                 "dependencies : "
+                "loc=%p task=%p, transferring to __kmpc_omp_task\n",
+                gtid, loc_ref, new_taskdata);
   KA_TRACE(10, ("__kmpc_omp_task_with_deps(exit): T#%d task had no blocking "
                 "dependencies : "
                 "loc=%p task=%p, transferring to __kmpc_omp_task\n",

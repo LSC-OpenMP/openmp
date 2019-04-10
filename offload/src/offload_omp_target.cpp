@@ -17,12 +17,12 @@
 void omp_set_default_device(int num)
 {
 }
-
+/*
 int omp_get_default_device(void)
 {
     return mic_index;
 }
-
+*/
 int omp_get_num_devices()
 {
     return mic_engines_total;
@@ -98,6 +98,7 @@ void omp_get_num_procs_lrb(
 
 void omp_set_dynamic_lrb(
     void *ofld
+    asdf
 )
 {
     int dynamic;

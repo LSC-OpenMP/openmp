@@ -1176,7 +1176,7 @@ int32_t DeviceTy::run_region(void *TgtEntryPtr, void **TgtVarsPtr,
 int32_t DeviceTy::run_team_region(void *TgtEntryPtr, void **TgtVarsPtr,
     ptrdiff_t *TgtOffsets, int32_t TgtVarsSize, int32_t NumTeams,
     int32_t ThreadLimit, uint64_t LoopTripCount) {
-  DP("entering DeviceTy::run_team_region\n");
+       DP("entering DeviceTy::run_team_region\n");
   int32_t ret = RTL->run_team_region(RTLDeviceID, TgtEntryPtr, TgtVarsPtr, TgtOffsets,
       TgtVarsSize, NumTeams, ThreadLimit, LoopTripCount);
   DP("exiting DeviceTy::run_team_region\n");
@@ -1211,7 +1211,7 @@ static void RegisterImageIntoTranslationTable(TranslationTable &TT,
       TT.TargetsTable[RTL.Idx + i] = 0; // lazy initialization of target table.
     }
   }
-  DP("exiting DeviceTy::run_team_region\n");
+  DP("exiting RegisterImageIntoTranslationTable\n");
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2327,9 +2327,7 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
       TgtPtrBegin = Device.getTgtPtrBegin(HstPtrBase, sizeof(void *), IsLast,
           false);
       TgtBaseOffset = 0; // no offset for ptrs.
-      printf("Obtained target argument " DPxMOD " from host pointer " DPxMOD " to "
-         "object " DPxMOD "\n", DPxPTR(TgtPtrBegin), DPxPTR(HstPtrBase),
-         DPxPTR(HstPtrBase));
+      
       DP("Obtained target argument " DPxMOD " from host pointer " DPxMOD " to "
          "object " DPxMOD "\n", DPxPTR(TgtPtrBegin), DPxPTR(HstPtrBase),
          DPxPTR(HstPtrBase));
@@ -2506,9 +2504,13 @@ EXTERN void __kmpc_push_target_tripcount(int64_t device_id,
   DP("entering __kmpc_push_target_tripcount\n");
 
   device_id = translate_device_id(device_id);
+
   if (device_id == OFFLOAD_DEVICE_DEFAULT) {
+    DP("entering __kmpc_push_target_tripcount RAFAEL %d\n",device_id);
     device_id = omp_get_default_device();
+    DP("entering __kmpc_push_target_tripcount DEU BOSTA %d\n",device_id);
   }
+
 
   if (CheckDevice(device_id) != OFFLOAD_SUCCESS) {
     DP("Failed to get device %" PRId64 " ready\n", device_id);
@@ -2516,7 +2518,7 @@ EXTERN void __kmpc_push_target_tripcount(int64_t device_id,
     return;
   }
 
-  DP("__kmpc_push_target_tripcount(%" PRId64 ", %" PRIu64 ")\n", device_id,
+  DP("__kmpc_push_target_tripcount DEB(%" PRId64 ", %" PRIu64 ")\n", device_id,
       loop_tripcount);
   Devices[device_id].loopTripCnt = loop_tripcount;
   DP("exiting __kmpc_push_target_tripcount\n");
@@ -2587,5 +2589,12 @@ __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size) {
   }
     DP("exiting __tgt_check_compare\n");
 }
+
+
+// HTASK PRE-OFFLOAD FEATURE
+EXTERN void __tgt_preoffload(void){
+  printf("\n\n  entering __TGT_PREOFFLOAD \n\n");
+}
+
 
 

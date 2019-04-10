@@ -120,6 +120,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
 #endif
 
 #if OMPT_SUPPORT && OMPT_BLAME
+  //printf("OMPT_SUPPORT && OMPT_BLAME\n");
   ompt_state_t ompt_state = this_thr->th.ompt_thread_info.state;
   if (ompt_enabled && ompt_state != ompt_state_undefined) {
     if (ompt_state == ompt_state_idle) {
@@ -158,7 +159,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
 // The worker threads cannot rely on the team struct existing at this point.
 // Use the bt values cached in the thread struct instead.
 #ifdef KMP_ADJUST_BLOCKTIME
-    //printf("__kmp_wait_sleep: T#%d KMP_ADJUST_BLOCKTIME DEFINED\n", th_gtid);
+    ///printf("__kmp_wait_sleep: T#%d KMP_ADJUST_BLOCKTIME DEFINED\n", th_gtid);
     if (__kmp_zero_bt && !this_thr->th.th_team_bt_set)
       // Force immediate suspend if not set by user and more threads than
       // available procs
@@ -169,7 +170,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     //printf("__kmp_wait_sleep: T#%d KMP_ADJUST_BLOCKTIME NOT DEFINED\n", th_gtid);
     hibernate = this_thr->th.th_team_bt_intervals;
 #endif /* KMP_ADJUST_BLOCKTIME */
-   // printf("__kmp_wait_sleep: T#%d hibernate 1\n", th_gtid);
+    //printf("__kmp_wait_sleep: T#%d hibernate 1\n", th_gtid);
 
     /* If the blocktime is nonzero, we want to make sure that we spin wait for
        the entirety of the specified #intervals, plus up to one interval more.
@@ -182,8 +183,8 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     // Add in the current time value.
     hibernate += TCR_4(__kmp_global.g.g_time.dt.t_value);
    // printf("__kmp_wait_sleep: T#%d now=%d, hibernate=%d, intervals=%d\n",
-                  th_gtid, __kmp_global.g.g_time.dt.t_value, hibernate,
-                  hibernate - __kmp_global.g.g_time.dt.t_value);
+   //               th_gtid, __kmp_global.g.g_time.dt.t_value, hibernate,
+   //               hibernate - __kmp_global.g.g_time.dt.t_value);
     KF_TRACE(20, ("__kmp_wait_sleep: T#%d now=%d, hibernate=%d, intervals=%d\n",
                   th_gtid, __kmp_global.g.g_time.dt.t_value, hibernate,
                   hibernate - __kmp_global.g.g_time.dt.t_value));
@@ -204,6 +205,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
     kmp_task_team_t *task_team = NULL;
     if (__kmp_tasking_mode != tskm_immediate_exec) {
       task_team = this_thr->th.th_task_team;
+      //printf("__kmp_wait_sleep: T#%d main wait spin __kmp_tasking_mode != tskm_immediate_exec\n", th_gtid);
       /* If the thread's task team pointer is NULL, it means one of 3 things:
          1) A newly-created thread is first being released by
          __kmp_fork_barrier(), and its task team has not been set up yet.
@@ -212,7 +214,9 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
          serialized region (perhaps the outer one), or else tasking was manually
          disabled (KMP_TASKING=0).  */
       if (task_team != NULL) {
+        //printf("__kmp_wait_sleep: T#%d main wait spin task_team!=NULL\n", th_gtid);
         if (TCR_SYNC_4(task_team->tt.tt_active)) {
+           // printf("__kmp_wait_sleep: T#%d main wait spin TCR_SYNC_4(task_team->tt.tt_active)\n", th_gtid);
           if (KMP_TASKING_ENABLED(task_team)){
             //printf("__kmp_wait_sleep: T#%d main wait spin before execute_tasks\n", th_gtid);
             flag->execute_tasks(
@@ -300,7 +304,7 @@ __kmp_wait_template(kmp_info_t *this_thr, C *flag,
 #endif
 
     KF_TRACE(50, ("__kmp_wait_sleep: T#%d suspend time reached\n", th_gtid));
-   // printf("__kmp_wait_sleep: T#%d suspend time reached\n", th_gtid);
+    //printf("__kmp_wait_sleep: T#%d suspend time reached\n", th_gtid);
     flag->suspend(th_gtid);
 
     if (TCR_4(__kmp_global.g.g_done)) {
@@ -563,7 +567,7 @@ public:
   }
   void wait(kmp_info_t *this_thr,
             int final_spin USE_ITT_BUILD_ARG(void *itt_sync_obj)) {
-	  //printf("kmp_flag_64->wait T#%d\n",this_thr->th.th_info.ds.ds_gtid);
+	  printf("kmp_flag_64->wait T#%d\n",this_thr->th.th_info.ds.ds_gtid);
     __kmp_wait_template(this_thr, this,
                         final_spin USE_ITT_BUILD_ARG(itt_sync_obj));
   }

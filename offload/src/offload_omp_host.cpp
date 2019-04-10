@@ -21,11 +21,12 @@ void omp_set_default_device(int num)
     }
 }
 
-int omp_get_default_device(void)
+/*int omp_get_default_device(void)
 {
+    DP("DEU BOSTA\n");
     return __omp_device_num;
 }
-
+*/
 int omp_get_num_devices()
 {
     __offload_init_library();
