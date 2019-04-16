@@ -241,7 +241,7 @@ void __kmpc_push_target_tripcount(int64_t device_id, uint64_t loop_tripcount);
 void __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size);
 
 
-void __tgt_preoffload();
+int __tgt_preoffload(void* addr, int size, int dev);
 
 #ifdef __cplusplus
 }

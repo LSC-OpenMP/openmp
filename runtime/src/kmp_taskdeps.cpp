@@ -416,6 +416,16 @@ static bool __kmp_check_deps(kmp_int32 gtid, kmp_depnode_t *node,
   return npredecessors > 0 ? true : false;
 }
 
+bool is_dep(kmp_depend_info_t *dep, kmp_taskdata_t *tsk){
+  for (size_t i = 0; i < tsk->ndeps; i++)
+  {
+    if(dep->base_addr == tsk->dep_list[i].base_addr)
+      return true;
+  }
+  
+  return false;
+}
+
 void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_depnode_t *node = task->td_depnode;
@@ -443,11 +453,34 @@ void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   node->dn.task =
       NULL; // mark this task as finished, so no new dependencies are generated
   KMP_RELEASE_DEPNODE(gtid, node);
-
+  kmp_task_t *tsk = KMP_TASKDATA_TO_TASK(task);
   kmp_depnode_list_t *next;
   for (kmp_depnode_list_t *p = node->dn.successors; p; p = next) {
     kmp_depnode_t *successor = p->node;
-    kmp_int32 npredecessors =
+
+    // ########### BEGIN OF HTASK STUFFS ################
+
+    printf("__kmp_release_deps: T#%d notifying successors of task %p.\n"
+            "Sucessors isDev = %d, devId = %d, my devID = %d",
+             gtid, task, successor->dn.task->isDev, successor->dn.task->devId, tsk->devId);
+    
+    if(successor->dn.task->isDev && (tsk->devId != successor->dn.task->devId)){
+      printf("\n\n Candidate to preoffloading \n\n\n\n");
+      for (size_t i = 0; i < task->ndeps; i++)
+      {
+        if(!task->dep_list[i].flags.out) continue;
+
+        if(is_dep(&(task->dep_list[i]), KMP_TASK_TO_TASKDATA(successor->dn.task))){
+          printf("\n\n\n DO THE PRE OFFLOAD\n\n");
+          __tgt_preoffload((void*)task->dep_list[i].base_addr, task->dep_list[i].len, successor->dn.task->devId);
+        }
+      }
+      
+    }
+
+    // ########### END OF HTASK STUFFS ################
+
+    kmp_int32 npredecessors = 
         KMP_TEST_THEN_DEC32(CCAST(kmp_int32 *, &successor->dn.npredecessors)) -
         1;
     // successor task can be NULL for wait_depends or because deps are still
@@ -462,7 +495,6 @@ void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
                       "for execution.\n",
                       gtid, successor->dn.task, task));
 	printf("kmp_omp_release_deps calling __kmp_omp_task\n");
-        __tgt_preoffload();
         __kmp_omp_task(gtid, successor->dn.task, false);
       }
     }
@@ -508,13 +540,20 @@ kmp_int32 __kmpc_omp_task_with_deps(ident_t *loc_ref, kmp_int32 gtid,
                                     kmp_int32 ndeps_noalias,
                                     kmp_depend_info_t *noalias_dep_list) {
 
-  printf("Kmpc --> __kmpc_omp_task_with_deps says: isDev: %d / devId: %d / ndeps %d / ndeps_noalias %d\n", new_task->isDev, new_task->devId, ndeps, ndeps_noalias);
+  printf("Kmpc --> __kmpc_omp_task_with_deps says: "
+        "isDev: %d / devId: %d / ndeps %d / ndeps_noalias %d\n",
+         new_task->isDev, new_task->devId, ndeps, ndeps_noalias);
   kmp_taskdata_t *new_taskdata = KMP_TASK_TO_TASKDATA(new_task);
       printf("kmpc --> __kmpc_omp_task_with_deps(enter): T#%d loc=%p task=%p\n", gtid,loc_ref, new_taskdata);
   KA_TRACE(10, ("__kmpc_omp_task_with_deps(enter): T#%d loc=%p task=%p\n", gtid,
                 loc_ref, new_taskdata));
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_taskdata_t *current_task = thread->th.th_current_task;
+
+  new_taskdata->dep_list = (kmp_depend_info_t*) malloc(sizeof(kmp_depend_info_t)*ndeps);
+  memcpy(new_taskdata->dep_list, dep_list, sizeof(kmp_depend_info_t)*ndeps);
+  new_taskdata->ndeps = ndeps;
+
 
   //printf("kmpc --> __kmpc_omp_task_with_deps current task: %d / new task: %d \n", current_task->td_flags.tasktype, new_taskdata->td_flags.tasktype);
 #if OMPT_SUPPORT && OMPT_TRACE

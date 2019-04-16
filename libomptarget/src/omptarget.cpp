@@ -2592,8 +2592,9 @@ __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size) {
 
 
 // HTASK PRE-OFFLOAD FEATURE
-EXTERN void __tgt_preoffload(void){
+EXTERN int __tgt_preoffload(void* addr, int size, int dev){
   printf("\n\n  entering __TGT_PREOFFLOAD \n\n");
+  return 1;
 }
 
 

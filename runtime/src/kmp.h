@@ -2253,6 +2253,10 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
   kmp_task_team_t *td_task_team;
   kmp_int32 td_size_alloc; // The size of task structure, including shareds etc.
 #endif
+
+// HTASK MODIFICATIONS
+  kmp_depend_info_t *dep_list; 
+  kmp_int32 ndeps;
 }; // struct kmp_taskdata
 
 // Make sure padding above worked
@@ -3728,7 +3732,7 @@ KMP_EXPORT kmp_uint64 __kmpc_get_parent_taskid();
 // missing 'extern "C"' declarations
 
 
-KMP_EXPORT void __tgt_preoffload(void) __attribute__((weak));
+KMP_EXPORT int __tgt_preoffload(void* addr, int size, int dev) __attribute__((weak));
 
 KMP_EXPORT kmp_int32 __kmpc_in_parallel(ident_t *loc);
 KMP_EXPORT void __kmpc_pop_num_threads(ident_t *loc, kmp_int32 global_tid);
