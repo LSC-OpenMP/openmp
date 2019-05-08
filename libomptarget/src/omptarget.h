@@ -130,7 +130,9 @@ int omp_get_default_device(void) __attribute__((weak));
 kmp_int32 __kmpc_omp_taskwait(ident_t *loc_ref, kmp_int32 gtid) __attribute__((weak));
 kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
     kmp_int32 flags, size_t sizeof_kmp_task_t, size_t sizeof_shareds,
-    kmp_routine_entry_t task_entry, int isDev = 0, int devId = -1) __attribute__((weak));
+    kmp_routine_entry_t task_entry, int isDev = 0, int devId = -1,
+    int32_t arg_num = 0, void** args_base = NULL, void **args = NULL,
+    size_t *arg_sizes = NULL,int64_t *arg_types = NULL) __attribute__((weak));
 
 int omp_get_num_devices(void);
 int omp_get_initial_device(void);
@@ -241,7 +243,12 @@ void __kmpc_push_target_tripcount(int64_t device_id, uint64_t loop_tripcount);
 void __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size);
 
 
-int __tgt_preoffload(void* addr, int size, int dev);
+int __tgt_preoffload(int arg_num,
+                      void **args_base,
+                      void **arg,
+                      int64_t *arg_sizes,
+                      int64_t *arg_types,
+                      int dev);
 
 #ifdef __cplusplus
 }

@@ -18,6 +18,7 @@
 #include "kmp.h"
 #include "kmp_io.h"
 #include "kmp_wait_release.h"
+#include "kmp_stats.h"
 
 
 #if OMP_40_ENABLED
@@ -425,6 +426,50 @@ bool is_dep(kmp_depend_info_t *dep, kmp_taskdata_t *tsk){
   
   return false;
 }
+#define TO 0x001
+#define TOFROM 0x023
+#define FROM 0x002
+
+void pre_offload_args(kmp_taskdata_t *stask,
+                      kmp_taskdata_t *dtask,
+                      int *arg_num,
+                      void ***args_base,
+                      void ***args,
+                      int64_t **arg_sizes,
+                      int64_t **arg_types){
+
+  printf("__pre_offload_args\n");                      
+  // work around FIXME
+  int indexs[10];
+  int idx =0;
+  
+  for(int i = 0; i < stask->arg_num; i++){
+    if(stask->arg_types[i]!=TO && stask->arg_types[i]!=TOFROM) continue;
+    for(int j = 0; j < dtask->arg_num; j++){
+      if(dtask->arg_types[j]!=FROM && dtask->arg_types[i]!=TOFROM) continue;
+      if(stask->args[i]==dtask->args[j]){
+        indexs[idx] = j;
+        idx++;
+      }
+    }
+  }
+  printf("arg_num value = %d\n", stask->arg_num);
+  *arg_num = idx;
+  *args_base = (void**)malloc(sizeof(void*)*idx);
+  *args = (void**)malloc(sizeof(void*)*idx);
+  *arg_sizes = (int64_t*)malloc(sizeof(int64_t)*idx);
+  *arg_types = (int64_t*)malloc(sizeof(int64_t)*idx);
+
+  for(int i = 0; i < idx; i++){
+    *args_base[i]=dtask->args_base[indexs[i]];
+    *args[i]=dtask->args[indexs[i]];
+    *arg_sizes[i]=dtask->arg_sizes[indexs[i]];
+    *arg_types[i]=dtask->arg_types[indexs[i]];
+    }
+printf("arg_size = %d\n", *arg_sizes[0]);
+
+
+}
 
 void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
   kmp_info_t *thread = __kmp_threads[gtid];
@@ -465,14 +510,29 @@ void __kmp_release_deps(kmp_int32 gtid, kmp_taskdata_t *task) {
              gtid, task, successor->dn.task->isDev, successor->dn.task->devId, tsk->devId);
     
     if(successor->dn.task->isDev && (tsk->devId != successor->dn.task->devId)){
-      printf("\n\n Candidate to preoffloading \n\n\n\n");
+      printf("\n\n Candidate to preoffloading sizeof int64_t = %d\n\n\n\n", sizeof(int64_t));
       for (size_t i = 0; i < task->ndeps; i++)
       {
         if(!task->dep_list[i].flags.out) continue;
 
         if(is_dep(&(task->dep_list[i]), KMP_TASK_TO_TASKDATA(successor->dn.task))){
+          void **args_base;
+          void **args;
+          int64_t *arg_sizes;
+          int64_t *arg_types;
+          int arg_num = 0;
+
+          pre_offload_args(task, KMP_TASK_TO_TASKDATA(successor->dn.task),&arg_num, &args_base, &args, &arg_sizes, &arg_types);
+          printf("arg_size = %d\n", arg_sizes[0]);  
           printf("\n\n\n DO THE PRE OFFLOAD\n\n");
-          __tgt_preoffload((void*)task->dep_list[i].base_addr, task->dep_list[i].len, successor->dn.task->devId);
+          
+          __tgt_preoffload(arg_num, args_base, args, arg_sizes, arg_types, successor->dn.task->devId);
+          
+          free(args_base);
+          free(args);
+          free(arg_sizes);
+          free(arg_types);
+        
         }
       }
       

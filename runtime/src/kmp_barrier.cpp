@@ -71,11 +71,11 @@ static void __kmp_linear_barrier_gather(
   // We now perform a linear reduction to signal that all of the threads have
   // arrived.
   if (!KMP_MASTER_TID(tid)) {
-             printf("__kmp_linear_barrier_gather: T#%d(%d:%d) releasing T#%d(%d:%d)"
-              "arrived(%p): %llu => %llu\n",
-              gtid, team->t.t_id, tid, __kmp_gtid_from_tid(0, team),
-              team->t.t_id, 0, &thr_bar->b_arrived, thr_bar->b_arrived,
-              thr_bar->b_arrived + KMP_BARRIER_STATE_BUMP);
+             //printf("__kmp_linear_barrier_gather: T#%d(%d:%d) releasing T#%d(%d:%d)"
+             // "arrived(%p): %llu => %llu\n",
+             // gtid, team->t.t_id, tid, __kmp_gtid_from_tid(0, team),
+             // team->t.t_id, 0, &thr_bar->b_arrived, thr_bar->b_arrived,
+             // thr_bar->b_arrived + KMP_BARRIER_STATE_BUMP);
     KA_TRACE(20,
              ("__kmp_linear_barrier_gather: T#%d(%d:%d) releasing T#%d(%d:%d)"
               "arrived(%p): %llu => %llu\n",
@@ -104,11 +104,11 @@ static void __kmp_linear_barrier_gather(
       if (i + 1 < nproc)
         KMP_CACHE_PREFETCH(&other_threads[i + 1]->th.th_bar[bt].bb.b_arrived);
 #endif /* KMP_CACHE_MANAGE */
-      printf("__kmp_linear_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%d) "
-                    "arrived(%p) == %llu\n",
-                    gtid, team->t.t_id, tid, __kmp_gtid_from_tid(i, team),
-                    team->t.t_id, i,
-                    &other_threads[i]->th.th_bar[bt].bb.b_arrived, new_state);
+      //printf("__kmp_linear_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%d) "
+       //             "arrived(%p) == %llu\n",
+       //             gtid, team->t.t_id, tid, __kmp_gtid_from_tid(i, team),
+       //             team->t.t_id, i,
+       //             &other_threads[i]->th.th_bar[bt].bb.b_arrived, new_state);
       KA_TRACE(20, ("__kmp_linear_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%d) "
                     "arrived(%p) == %llu\n",
                     gtid, team->t.t_id, tid, __kmp_gtid_from_tid(i, team),
@@ -212,8 +212,8 @@ static void __kmp_linear_barrier_release(
       }
     }
   } else { // Wait for the MASTER thread to release us
-    printf("__kmp_linear_barrier_release: T#%d wait go(%p) == %u\n",
-                  gtid, &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
+    //printf("__kmp_linear_barrier_release: T#%d wait go(%p) == %u\n",
+    //              gtid, &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
     KA_TRACE(20, ("__kmp_linear_barrier_release: T#%d wait go(%p) == %u\n",
                   gtid, &thr_bar->b_go, KMP_BARRIER_STATE_BUMP));
     kmp_flag_64 flag(&thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
@@ -303,10 +303,10 @@ __kmp_tree_barrier_gather(enum barrier_type bt, kmp_info_t *this_thr, int gtid,
         KMP_CACHE_PREFETCH(
             &other_threads[child_tid + 1]->th.th_bar[bt].bb.b_arrived);
 #endif /* KMP_CACHE_MANAGE */
-               printf("__kmp_tree_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%u) "
-                "arrived(%p) == %llu\n",
-                gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
-                team->t.t_id, child_tid, &child_bar->b_arrived, new_state);
+               //printf("__kmp_tree_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%u) "
+               // "arrived(%p) == %llu\n",
+               // gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
+               // team->t.t_id, child_tid, &child_bar->b_arrived, new_state);
       KA_TRACE(20,
                ("__kmp_tree_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%u) "
                 "arrived(%p) == %llu\n",
@@ -388,8 +388,8 @@ static void __kmp_tree_barrier_release(
   // Perform a tree release for all of the threads that have been gathered
   if (!KMP_MASTER_TID(
           tid)) { // Handle fork barrier workers who aren't part of a team yet
-    printf("__kmp_tree_barrier_release: T#%d wait go(%p) == %u\n", gtid,
-                  &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
+    //printf("__kmp_tree_barrier_release: T#%d wait go(%p) == %u\n", gtid,
+    //              &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
     KA_TRACE(20, ("__kmp_tree_barrier_release: T#%d wait go(%p) == %u\n", gtid,
                   &thr_bar->b_go, KMP_BARRIER_STATE_BUMP));
     // Wait for parent thread to release us
@@ -498,8 +498,8 @@ __kmp_hyper_barrier_gather(enum barrier_type bt, kmp_info_t *this_thr, int gtid,
   kmp_uint32 offset;
   kmp_uint32 level;
 
-  printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) enter for barrier type %d\n",
-       gtid, team->t.t_id, tid, bt);
+  //printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) enter for barrier type %d\n",
+  //     gtid, team->t.t_id, tid, bt);
   KA_TRACE(
       20,
       ("__kmp_hyper_barrier_gather: T#%d(%d:%d) enter for barrier type %d\n",
@@ -524,12 +524,12 @@ __kmp_hyper_barrier_gather(enum barrier_type bt, kmp_info_t *this_thr, int gtid,
     if (((tid >> level) & (branch_factor - 1)) != 0) {
       kmp_int32 parent_tid = tid & ~((1 << (level + branch_bits)) - 1);
 
-      printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) releasing T#%d(%d:%d) "
-                "arrived(%p): %llu => %llu\n",
-                gtid, team->t.t_id, tid, __kmp_gtid_from_tid(parent_tid, team),
-                team->t.t_id, parent_tid, &thr_bar->b_arrived,
-                thr_bar->b_arrived,
-                thr_bar->b_arrived + KMP_BARRIER_STATE_BUMP);
+      //printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) releasing T#%d(%d:%d) "
+      //          "arrived(%p): %llu => %llu\n",
+      //          gtid, team->t.t_id, tid, __kmp_gtid_from_tid(parent_tid, team),
+      //          team->t.t_id, parent_tid, &thr_bar->b_arrived,
+      //          thr_bar->b_arrived,
+      //          thr_bar->b_arrived + KMP_BARRIER_STATE_BUMP);
       KA_TRACE(20,
                ("__kmp_hyper_barrier_gather: T#%d(%d:%d) releasing T#%d(%d:%d) "
                 "arrived(%p): %llu => %llu\n",
@@ -562,10 +562,10 @@ __kmp_hyper_barrier_gather(enum barrier_type bt, kmp_info_t *this_thr, int gtid,
         KMP_CACHE_PREFETCH(
             &other_threads[next_child_tid]->th.th_bar[bt].bb.b_arrived);
 #endif /* KMP_CACHE_MANAGE */
-      printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%u) "
-                "arrived(%p) == %llu\n",
-                gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
-                team->t.t_id, child_tid, &child_bar->b_arrived, new_state);
+      //printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%u) "
+      //          "arrived(%p) == %llu\n",
+      //          gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
+      //          team->t.t_id, child_tid, &child_bar->b_arrived, new_state);
       KA_TRACE(20,
                ("__kmp_hyper_barrier_gather: T#%d(%d:%d) wait T#%d(%d:%u) "
                 "arrived(%p) == %llu\n",
@@ -584,9 +584,9 @@ __kmp_hyper_barrier_gather(enum barrier_type bt, kmp_info_t *this_thr, int gtid,
       }
 #endif
       if (reduce) {
-        printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) += T#%d(%d:%u)\n",
-                  gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
-                  team->t.t_id, child_tid);
+        //printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) += T#%d(%d:%u)\n",
+        //          gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
+        //          team->t.t_id, child_tid);
         KA_TRACE(100,
                  ("__kmp_hyper_barrier_gather: T#%d(%d:%d) += T#%d(%d:%u)\n",
                   gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
@@ -615,8 +615,8 @@ __kmp_hyper_barrier_gather(enum barrier_type bt, kmp_info_t *this_thr, int gtid,
                   gtid, team->t.t_id, tid, team->t.t_id,
                   &team->t.t_bar[bt].b_arrived, team->t.t_bar[bt].b_arrived));
   }
-  printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) exit for barrier type %d\n",
-           gtid, team->t.t_id, tid, bt);
+  //printf("__kmp_hyper_barrier_gather: T#%d(%d:%d) exit for barrier type %d\n",
+  //         gtid, team->t.t_id, tid, bt);
   KA_TRACE(
       20, ("__kmp_hyper_barrier_gather: T#%d(%d:%d) exit for barrier type %d\n",
            gtid, team->t.t_id, tid, bt));
@@ -658,17 +658,17 @@ static void __kmp_hyper_barrier_release(
     }
 #endif
   } else { // Handle fork barrier workers who aren't part of a team yet
-    printf("__kmp_hyper_barrier_release: T#%d wait go(%p) == %u\n", gtid,
-                  &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
+    //printf("__kmp_hyper_barrier_release: T#%d wait go(%p) == %u\n", gtid,
+    //              &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
     KA_TRACE(20, ("__kmp_hyper_barrier_release: T#%d wait go(%p) == %u\n", gtid,
                   &thr_bar->b_go, KMP_BARRIER_STATE_BUMP));
-    printf(" Wait for parent thread to release us\n");
+    //printf(" Wait for parent thread to release us\n");
     kmp_flag_64 flag(&thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
     
     flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
     
-    printf("__kmp_hyper_barrier_release: AFTER T#%d wait go(%p) == %u\n", gtid,
-                  &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
+    //printf("__kmp_hyper_barrier_release: AFTER T#%d wait go(%p) == %u\n", gtid,
+    //              &thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
     
     ANNOTATE_BARRIER_END(this_thr);
 #if USE_ITT_BUILD && USE_ITT_NOTIFY
@@ -697,8 +697,8 @@ static void __kmp_hyper_barrier_release(
     tid = __kmp_tid_from_gtid(gtid);
 
     TCW_4(thr_bar->b_go, KMP_INIT_BARRIER_STATE);
-    printf("__kmp_hyper_barrier_release: T#%d(%d:%d) set go(%p) = %u\n",
-              gtid, team->t.t_id, tid, &thr_bar->b_go, KMP_INIT_BARRIER_STATE); 
+    //printf("__kmp_hyper_barrier_release: T#%d(%d:%d) set go(%p) = %u\n",
+    //          gtid, team->t.t_id, tid, &thr_bar->b_go, KMP_INIT_BARRIER_STATE); 
     KA_TRACE(20,
              ("__kmp_hyper_barrier_release: T#%d(%d:%d) set go(%p) = %u\n",
               gtid, team->t.t_id, tid, &thr_bar->b_go, KMP_INIT_BARRIER_STATE));
@@ -763,11 +763,11 @@ static void __kmp_hyper_barrier_release(
           copy_icvs(&child_bar->th_fixed_icvs, &thr_bar->th_fixed_icvs);
 #endif // KMP_BARRIER_ICV_PUSH
 
-        printf("__kmp_hyper_barrier_release: T#%d(%d:%d) releasing T#%d(%d:%u)"
-             "go(%p): %u => %u\n",
-             gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
-             team->t.t_id, child_tid, &child_bar->b_go, child_bar->b_go,
-             child_bar->b_go + KMP_BARRIER_STATE_BUMP);
+        //printf("__kmp_hyper_barrier_release: T#%d(%d:%d) releasing T#%d(%d:%u)"
+        //     "go(%p): %u => %u\n",
+        //     gtid, team->t.t_id, tid, __kmp_gtid_from_tid(child_tid, team),
+        //     team->t.t_id, child_tid, &child_bar->b_go, child_bar->b_go,
+        //     child_bar->b_go + KMP_BARRIER_STATE_BUMP);
         KA_TRACE(
             20,
             ("__kmp_hyper_barrier_release: T#%d(%d:%d) releasing T#%d(%d:%u)"
@@ -791,8 +791,8 @@ static void __kmp_hyper_barrier_release(
               &thr_bar->th_fixed_icvs);
   }
 #endif
-  printf("__kmp_hyper_barrier_release: T#%d(%d:%d) exit for barrier type %d\n",
-       gtid, team->t.t_id, tid, bt);
+ // printf("__kmp_hyper_barrier_release: T#%d(%d:%d) exit for barrier type %d\n",
+  //     gtid, team->t.t_id, tid, bt);
   KA_TRACE(
       20,
       ("__kmp_hyper_barrier_release: T#%d(%d:%d) exit for barrier type %d\n",
@@ -923,9 +923,9 @@ static void __kmp_hierarchical_barrier_gather(
             KMP_MASTER_TID(tid)
                 ? thr_bar->b_arrived | thr_bar->leaf_state
                 : team->t.t_bar[bt].b_arrived | thr_bar->leaf_state;
-        printf("__kmp_hierarchical_barrier_gather: T#%d(%d:%d) waiting "
-                      "for leaf kids\n",
-                      gtid, team->t.t_id, tid);
+        //printf("__kmp_hierarchical_barrier_gather: T#%d(%d:%d) waiting "
+        //              "for leaf kids\n",
+        //              gtid, team->t.t_id, tid);
         KA_TRACE(20, ("__kmp_hierarchical_barrier_gather: T#%d(%d:%d) waiting "
                       "for leaf kids\n",
                       gtid, team->t.t_id, tid));
@@ -966,12 +966,12 @@ static void __kmp_hierarchical_barrier_gather(
                         gtid, team->t.t_id, tid,
                         __kmp_gtid_from_tid(child_tid, team), team->t.t_id,
                         child_tid, &child_bar->b_arrived, new_state));
-           printf("__kmp_hierarchical_barrier_gather: T#%d(%d:%d) wait "
-                        "T#%d(%d:%d) "
-                        "arrived(%p) == %llu\n",
-                        gtid, team->t.t_id, tid,
-                        __kmp_gtid_from_tid(child_tid, team), team->t.t_id,
-                        child_tid, &child_bar->b_arrived, new_state);
+          // printf("__kmp_hierarchical_barrier_gather: T#%d(%d:%d) wait "
+          //              "T#%d(%d:%d) "
+          //              "arrived(%p) == %llu\n",
+          //              gtid, team->t.t_id, tid,
+          //              __kmp_gtid_from_tid(child_tid, team), team->t.t_id,
+          //              child_tid, &child_bar->b_arrived, new_state);
           kmp_flag_64 flag(&child_bar->b_arrived, new_state);
           flag.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
           ANNOTATE_BARRIER_END(child_thr);
@@ -1006,12 +1006,12 @@ static void __kmp_hierarchical_barrier_gather(
                         __kmp_gtid_from_tid(child_tid, team), team->t.t_id,
                         child_tid, &child_bar->b_arrived, new_state));
 
-           printf("__kmp_hierarchical_barrier_gather: T#%d(%d:%d) wait "
-                        "T#%d(%d:%d) "
-                        "arrived(%p) == %llu\n",
-                        gtid, team->t.t_id, tid,
-                        __kmp_gtid_from_tid(child_tid, team), team->t.t_id,
-                        child_tid, &child_bar->b_arrived, new_state);
+          // printf("__kmp_hierarchical_barrier_gather: T#%d(%d:%d) wait "
+          //              "T#%d(%d:%d) "
+          //              "arrived(%p) == %llu\n",
+          //              gtid, team->t.t_id, tid,
+          //              __kmp_gtid_from_tid(child_tid, team), team->t.t_id,
+          //              child_tid, &child_bar->b_arrived, new_state);
 
           kmp_flag_64 flag(&child_bar->b_arrived, new_state);
           flag.wait(this_thr, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
@@ -1093,7 +1093,7 @@ static void __kmp_hierarchical_barrier_release(
         __kmp_dflt_blocktime != KMP_MAX_BLOCKTIME || thr_bar->my_level != 0 ||
         thr_bar->team == NULL) {
       // Use traditional method of waiting on my own b_go flag
-      printf("Use traditional method of waiting on my own b_go flag");
+      //printf("Use traditional method of waiting on my own b_go flag");
       thr_bar->wait_flag = KMP_BARRIER_OWN_FLAG;
       kmp_flag_64 flag(&thr_bar->b_go, KMP_BARRIER_STATE_BUMP);
       flag.wait(this_thr, TRUE USE_ITT_BUILD_ARG(itt_sync_obj));
@@ -1103,7 +1103,7 @@ static void __kmp_hierarchical_barrier_release(
     } else { // Thread barrier data is initialized, this is a leaf, blocktime is
       // infinite, not nested
       // Wait on my "offset" bits on parent's b_go flag
-      printf("Wait on my bits on parent's b_go flag");
+      //printf("Wait on my bits on parent's b_go flag");
       thr_bar->wait_flag = KMP_BARRIER_PARENT_FLAG;
       kmp_flag_oncore flag(&thr_bar->parent_bar->b_go, KMP_BARRIER_STATE_BUMP,
                            thr_bar->offset, bt,
@@ -1312,8 +1312,8 @@ int __kmp_barrier(enum barrier_type bt, int gtid, int is_split,
   ompt_parallel_id_t my_parallel_id;
 #endif
 
-  printf("__kmp_barrier: T#%d(%d:%d) has arrived\n", gtid,
-                __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid));
+  //printf("__kmp_barrier: T#%d(%d:%d) has arrived\n", gtid,
+  //              __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid));
   KA_TRACE(15, ("__kmp_barrier: T#%d(%d:%d) has arrived\n", gtid,
                 __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid)));
 
@@ -1355,8 +1355,8 @@ int __kmp_barrier(enum barrier_type bt, int gtid, int is_split,
 #endif /* USE_ITT_BUILD */
     if (__kmp_tasking_mode == tskm_extra_barrier) {
       __kmp_tasking_barrier(team, this_thr, gtid);
-      printf("__kmp_barrier: T#%d(%d:%d) past tasking barrier\n", gtid,
-                __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid));
+      //printf("__kmp_barrier: T#%d(%d:%d) past tasking barrier\n", gtid,
+      //          __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid));
       KA_TRACE(15,
                ("__kmp_barrier: T#%d(%d:%d) past tasking barrier\n", gtid,
                 __kmp_team_from_gtid(gtid)->t.t_id, __kmp_tid_from_gtid(gtid)));
@@ -1405,7 +1405,7 @@ int __kmp_barrier(enum barrier_type bt, int gtid, int is_split,
       // to 0; use linear
       __kmp_hyper_barrier_gather(bt, this_thr, gtid, tid,
                                  reduce USE_ITT_BUILD_ARG(itt_sync_obj));
-       printf("__kmp_barrier: T#%d returning from __kmp_hyper_barrier \n",gtid);
+       //printf("__kmp_barrier: T#%d returning from __kmp_hyper_barrier \n",gtid);
       break;
     }
     case bp_hierarchical_bar: {
@@ -1429,10 +1429,10 @@ int __kmp_barrier(enum barrier_type bt, int gtid, int is_split,
     KMP_MB();
 
     if (KMP_MASTER_TID(tid)) {
-      printf("__kmp_barrier: T#%d IS KMP_MASTER_TID\n", gtid);
+      //printf("__kmp_barrier: T#%d IS KMP_MASTER_TID\n", gtid);
       status = 0;
       if (__kmp_tasking_mode != tskm_immediate_exec) {
-        printf("__kmp_barrier: T#%d calling __kmp_task_team_wait\n", gtid);
+        //printf("__kmp_barrier: T#%d calling __kmp_task_team_wait\n", gtid);
         __kmp_task_team_wait(this_thr, team USE_ITT_BUILD_ARG(itt_sync_obj));
       }
 #if USE_DEBUGGER
@@ -1511,32 +1511,32 @@ int __kmp_barrier(enum barrier_type bt, int gtid, int is_split,
     if (status == 1 || !is_split) {
       switch (__kmp_barrier_release_pattern[bt]) {
       case bp_hyper_bar: {
-        printf("__kmp_barrier: T#%d bd_hyper_bar switch\n",gtid);
+        //printf("__kmp_barrier: T#%d bd_hyper_bar switch\n",gtid);
         KMP_ASSERT(__kmp_barrier_release_branch_bits[bt]);
         __kmp_hyper_barrier_release(bt, this_thr, gtid, tid,
                                     FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
         break;
       }
       case bp_hierarchical_bar: {
-        printf("__kmp_barrier: T#%d bd_hierarchical_bar switch\n",gtid);
+        //printf("__kmp_barrier: T#%d bd_hierarchical_bar switch\n",gtid);
         __kmp_hierarchical_barrier_release(
             bt, this_thr, gtid, tid, FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
         break;
       }
       case bp_tree_bar: {
-        printf("__kmp_barrier: T#%d bd_tree_bar switch\n",gtid);
+        //printf("__kmp_barrier: T#%d bd_tree_bar switch\n",gtid);
         KMP_ASSERT(__kmp_barrier_release_branch_bits[bt]);
         __kmp_tree_barrier_release(bt, this_thr, gtid, tid,
                                    FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
         break;
       }
       default: {
-        printf("__kmp_barrier: T#%d default switch\n",gtid);
+        //printf("__kmp_barrier: T#%d default switch\n",gtid);
         __kmp_linear_barrier_release(bt, this_thr, gtid, tid,
                                      FALSE USE_ITT_BUILD_ARG(itt_sync_obj));
       }
       }
-      printf("__kmp_barrier: T#%d scape switch\n",gtid);
+      //printf("__kmp_barrier: T#%d scape switch\n",gtid);
       if (__kmp_tasking_mode != tskm_immediate_exec) {
         __kmp_task_team_sync(this_thr, team);
       }
@@ -1580,9 +1580,9 @@ int __kmp_barrier(enum barrier_type bt, int gtid, int is_split,
 #endif
     }
   }
-  printf("__kmp_barrier: T#%d(%d:%d) is leaving with return value %d\n",
-                gtid, __kmp_team_from_gtid(gtid)->t.t_id,
-                __kmp_tid_from_gtid(gtid), status);
+  //printf("__kmp_barrier: T#%d(%d:%d) is leaving with return value %d\n",
+  //              gtid, __kmp_team_from_gtid(gtid)->t.t_id,
+  //              __kmp_tid_from_gtid(gtid), status);
   KA_TRACE(15, ("__kmp_barrier: T#%d(%d:%d) is leaving with return value %d\n",
                 gtid, __kmp_team_from_gtid(gtid)->t.t_id,
                 __kmp_tid_from_gtid(gtid), status));

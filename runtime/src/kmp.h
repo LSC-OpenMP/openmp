@@ -2255,8 +2255,15 @@ struct kmp_taskdata { /* aligned during dynamic allocation       */
 #endif
 
 // HTASK MODIFICATIONS
+  
   kmp_depend_info_t *dep_list; 
   kmp_int32 ndeps;
+  int32_t arg_num;
+  void** args_base;
+  void **args;
+  int64_t *arg_sizes;
+  int64_t *arg_types;
+
 }; // struct kmp_taskdata
 
 // Make sure padding above worked
@@ -3428,7 +3435,11 @@ extern kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                     kmp_tasking_flags_t *flags,
                                     size_t sizeof_kmp_task_t,
                                     size_t sizeof_shareds,
-                                    kmp_routine_entry_t task_entry);
+                                    kmp_routine_entry_t task_entry,
+                                    int32_t arg_num = 0, void** args_base = NULL,
+                                    void **args = NULL, int64_t *arg_sizes = NULL,
+                                    int64_t *arg_types = NULL 
+                                    );
 extern void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
                                      kmp_team_t *team, int tid,
                                      int set_curr_task);
@@ -3602,7 +3613,10 @@ KMP_EXPORT kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                              kmp_int32 flags,
                                              size_t sizeof_kmp_task_t,
                                              size_t sizeof_shareds,
-                                             kmp_routine_entry_t task_entry, int isDev = 0, int devId = -1);
+                                             kmp_routine_entry_t task_entry,
+                                             int isDev = 0, int devId = -1,
+                                             int32_t arg_num = 0, void** args_base = NULL,
+                                            void **args = NULL, int64_t *arg_sizes = NULL,  int64_t *arg_types = NULL);
 KMP_EXPORT void __kmpc_omp_task_begin_if0(ident_t *loc_ref, kmp_int32 gtid,
                                           kmp_task_t *task);
 KMP_EXPORT void __kmpc_omp_task_complete_if0(ident_t *loc_ref, kmp_int32 gtid,
@@ -3732,7 +3746,13 @@ KMP_EXPORT kmp_uint64 __kmpc_get_parent_taskid();
 // missing 'extern "C"' declarations
 
 
-KMP_EXPORT int __tgt_preoffload(void* addr, int size, int dev) __attribute__((weak));
+KMP_EXPORT int __tgt_preoffload(
+                      int arg_num,
+                      void **args_base,
+                      void **args,
+                      int64_t *arg_sizes,
+                      int64_t *arg_types,
+                      int dev) __attribute__((weak));
 
 KMP_EXPORT kmp_int32 __kmpc_in_parallel(ident_t *loc);
 KMP_EXPORT void __kmpc_pop_num_threads(ident_t *loc, kmp_int32 global_tid);

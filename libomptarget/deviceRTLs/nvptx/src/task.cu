@@ -35,7 +35,8 @@ EXTERN kmp_TaskDescr *__kmpc_omp_task_alloc(
     uint32_t global_tid, // unused
     int32_t flag, // unused (because in our impl, all are immediately exec
     size_t sizeOfTaskInclPrivate, size_t sizeOfSharedTable,
-    kmp_TaskFctPtr taskSub, int isDev, int devId) {
+    kmp_TaskFctPtr taskSub, int isDev, int devId, int32_t arg_num,
+    void** args_base, void **args, size_t *arg_sizes,  int64_t *arg_types) {
   PRINT(LD_IO, "call __kmpc_omp_task_alloc(size priv&struct %lld, shared %lld, "
                "fct 0x%llx)\n",
         P64(sizeOfTaskInclPrivate), P64(sizeOfSharedTable), P64(taskSub));

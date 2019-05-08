@@ -177,7 +177,7 @@ struct DeviceTy {
   long getMapEntryRefCnt(void *HstPtrBegin);
   LookupResult lookupMapping(void *HstPtrBegin, int64_t Size);
   void *getOrAllocTgtPtr(void *HstPtrBegin, void *HstPtrBase, int64_t Size,
-      bool &IsNew, bool IsImplicit, bool UpdateRefCount = true);
+      bool &IsNew, bool IsImplicit, bool UpdateRefCount = true, int pod = 0);
   void *getTgtPtrBegin(void *HstPtrBegin, int64_t Size);
   void *getTgtPtrBegin(void *HstPtrBegin, int64_t Size, bool &IsLast,
       bool UpdateRefCount);
@@ -976,8 +976,10 @@ LookupResult DeviceTy::lookupMapping(void *HstPtrBegin, int64_t Size) {
 // If NULL is returned, then either data allocation failed or the user tried
 // to do an illegal mapping.
 void *DeviceTy::getOrAllocTgtPtr(void *HstPtrBegin, void *HstPtrBase,
-    int64_t Size, bool &IsNew, bool IsImplicit, bool UpdateRefCount) {
-  DP("entering DeviceTy::getOrAllocTgtPtr\n");
+    int64_t Size, bool &IsNew, bool IsImplicit, bool UpdateRefCount, int pod) {
+  int rfc = 1;
+  if (pod == 1) rfc = 0;
+  DP("entering DeviceTy::getOrAllocTgtPtr rfc = %d\n", rfc);
   void *rc = NULL;
   DataMapMtx.lock();
   LookupResult lr = lookupMapping(HstPtrBegin, Size);
@@ -1010,7 +1012,7 @@ void *DeviceTy::getOrAllocTgtPtr(void *HstPtrBegin, void *HstPtrBase,
         "HstEnd=" DPxMOD ", TgtBegin=" DPxMOD "\n", DPxPTR(HstPtrBase),
         DPxPTR(HstPtrBegin), DPxPTR((uintptr_t)HstPtrBegin + Size), DPxPTR(tp));
     HostDataToTargetMap.push_front(HostDataToTargetTy((uintptr_t)HstPtrBase,
-        (uintptr_t)HstPtrBegin, (uintptr_t)HstPtrBegin + Size, tp));
+        (uintptr_t)HstPtrBegin, (uintptr_t)HstPtrBegin + Size, tp, rfc));
     rc = (void *)tp;
   }
 
@@ -1593,8 +1595,15 @@ static int member_of(int64_t type) {
 
 /// Internal function to do the mapping and transfer the data to the device
 static int target_data_begin(DeviceTy &Device, int32_t arg_num,
-    void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types) {
-  DP("entering target_data_begin\n");
+    void **args_base, void **args, int64_t *arg_sizes, int64_t *arg_types, int pod = 0) {
+  DP("entering target_data_begin pod = %d\n", pod);
+
+  for (int i=0; i<arg_num; ++i) {
+    DP("Entry %2d: Base=" DPxMOD ", Begin=" DPxMOD ", Size=%" PRId64
+        ", Type=0x%" PRIx64 "\n", i, DPxPTR(args_base[i]), DPxPTR(args[i]),
+        arg_sizes[i], arg_types[i]);
+  }
+
   // process each input.
   int rc = OFFLOAD_SUCCESS;
   for (int32_t i = 0; i < arg_num; ++i) {
@@ -1640,8 +1649,9 @@ static int target_data_begin(DeviceTy &Device, int32_t arg_num,
       int parent_idx = member_of(arg_types[i]);
       if (parent_idx < 0 || !(arg_types[parent_idx] & OMP_TGT_MAPTYPE_PRIVATE)) {
         // base is address of pointer.
+        printf("base is address of pointer pod=%d\n",pod);
         Pointer_TgtPtrBegin = Device.getOrAllocTgtPtr(HstPtrBase, HstPtrBase,
-            sizeof(void *), Pointer_IsNew, IsImplicit, UpdateRef);
+            sizeof(void *), Pointer_IsNew, IsImplicit, UpdateRef, pod);
         if (!Pointer_TgtPtrBegin) {
           DP("target_data_begin Call to getOrAllocTgtPtr returned null pointer (device failure or "
              "illegal mapping).\n");
@@ -1655,9 +1665,9 @@ static int target_data_begin(DeviceTy &Device, int32_t arg_num,
       HstPtrBase = *(void **)HstPtrBase;
       UpdateRef = true; // subsequently update ref count of pointee
     }
-
+    printf("before getOrAllocTgtPtr pod=%d\n",pod);
     void *TgtPtrBegin = Device.getOrAllocTgtPtr(HstPtrBegin, HstPtrBase,
-        data_size, IsNew, IsImplicit, UpdateRef);
+        data_size, IsNew, IsImplicit, UpdateRef, pod);
     if (!TgtPtrBegin && data_size) {
       // If data_size==0, then the argument could be a zero-length pointer to
       // NULL, so getOrAlloc() returning NULL is not an error.
@@ -2526,7 +2536,20 @@ EXTERN void __kmpc_push_target_tripcount(int64_t device_id,
 
 EXTERN kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref,
     kmp_int32 gtid, kmp_int32 flags, size_t sizeof_kmp_task_t,
-    size_t sizeof_shareds, kmp_routine_entry_t task_entry, int64_t device_id) {
+    size_t sizeof_shareds, kmp_routine_entry_t task_entry, 
+    int64_t device_id, int32_t arg_num, void** args_base, void **args, size_t *arg_sizes, 
+    int64_t *arg_types
+) {
+
+  for (int i=0; i<arg_num; ++i) {
+  printf("\n\n\n ___KMPC_OMP_TARGET_TASK_ALLOC OMPTARGET BASE : %d \n\n\n", arg_num);
+
+    DP("Entry %2d: Base=" DPxMOD ", Begin=" DPxMOD ", Size=%" PRId64
+        ", Type=0x%" PRIx64 "\n", i, DPxPTR(args_base[i]), DPxPTR(args[i]),
+        arg_sizes[i], arg_types[i]);
+  }
+
+
   DP("entering __kmpc_omp_target_task_alloc\n");
   if (device_id == OFFLOAD_DEVICE_DEFAULT) {
     device_id = omp_get_default_device();
@@ -2542,7 +2565,8 @@ EXTERN kmp_task_t *__kmpc_omp_target_task_alloc(ident_t *loc_ref,
 //  return Klegacy_TaskAlloc(flag | KLEGACY_TARGET_TASK, sizeOfTaskInclPrivate,
 //    sizeOfSharedTable, sub, device_id, TRUE);
   kmp_task_t *ret =   __kmpc_omp_task_alloc(loc_ref, gtid, flags, sizeof_kmp_task_t,
-      sizeof_shareds, task_entry, 1, device_id);
+      sizeof_shareds, task_entry, 1, device_id, arg_num, 
+      args_base,args,arg_sizes,arg_types);
  
     DP("exiting __kmpc_omp_target_task_alloc\n");
   return ret;
@@ -2592,8 +2616,43 @@ __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size) {
 
 
 // HTASK PRE-OFFLOAD FEATURE
-EXTERN int __tgt_preoffload(void* addr, int size, int dev){
-  printf("\n\n  entering __TGT_PREOFFLOAD \n\n");
+EXTERN int __tgt_preoffload(int arg_num,
+                      void **args_base,
+                      void **args,
+                      int64_t *arg_sizes,
+                      int64_t *arg_types,
+                      int dev){
+  DP("\n\n\n ## entering __tgt_preoffload size of int64_t = %d ## \n", sizeof(int64_t));
+  printf("entering __tgt_preoffload %d\n", arg_num);
+
+
+  for (int i=0; i<arg_num; ++i) {
+    printf("\n\n\n OMPTARGET BASE : %x %x %d\n\n\n", args[i], args_base[i], arg_sizes[i]);
+
+    DP("Entry %2d: Base=" DPxMOD ", Begin=" DPxMOD ", Size=%" PRId64
+        ", Type=0x%" PRIx64 "\n", i, DPxPTR(args_base[i]), DPxPTR(args[i]),
+        arg_sizes[i], arg_types[i]);
+  }
+
+  dev = translate_device_id(dev);
+
+  // No devices available?
+  if (dev == OFFLOAD_DEVICE_DEFAULT) {
+    dev = omp_get_default_device();
+    DP("Use default device id %" PRId64 "\n", dev);
+  }
+
+  if (CheckDevice(dev) != OFFLOAD_SUCCESS) {
+    DP("Failed to get device %" PRId64 " ready\n", dev);
+    DP("exiting __tgt_target_data_begin\n");
+    return 0;
+  }
+
+  DeviceTy& Device = Devices[dev];
+
+  target_data_begin(Device, arg_num, args_base, args, arg_sizes, arg_types, 1);
+  printf("exiting __tgt_preoffload\n");
+  DP("exiting __tgt_preoffload\n");
   return 1;
 }
 

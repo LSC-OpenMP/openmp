@@ -54,9 +54,9 @@ static void __kmp_trace_task_stack(kmp_int32 gtid,
   kmp_int32 entries = task_stack->ts_entries;
   kmp_taskdata_t *tied_task;
 
-  printf("__kmp_trace_task_stack(start): location = %s, gtid = %d, entries = %d, "
-       "first_block = %p, stack_top = %p \n",
-       location, gtid, entries, task_stack->ts_first_block, stack_top);
+//  printf("__kmp_trace_task_stack(start): location = %s, gtid = %d, entries = %d, "
+//       "first_block = %p, stack_top = %p \n",
+//       location, gtid, entries, task_stack->ts_first_block, stack_top);
   KA_TRACE(
       threshold,
       ("__kmp_trace_task_stack(start): location = %s, gtid = %d, entries = %d, "
@@ -105,7 +105,7 @@ static void __kmp_trace_task_stack(kmp_int32 gtid,
 //  thread_data: thread data for task team thread containing stack
 static void __kmp_init_task_stack(kmp_int32 gtid,
                                   kmp_thread_data_t *thread_data) {
-  printf("__kmp_init_task_stack\n");
+//  printf("__kmp_init_task_stack\n");
   kmp_task_stack_t *task_stack = &thread_data->td.td_susp_tied_tasks;
   kmp_stack_block_t *first_block;
 
@@ -128,7 +128,7 @@ static void __kmp_init_task_stack(kmp_int32 gtid,
 static void __kmp_free_task_stack(kmp_int32 gtid,
                                   kmp_thread_data_t *thread_data) {
 
-  printf("__kmp_free_task_stack\n");
+//  printf("__kmp_free_task_stack\n");
   kmp_task_stack_t *task_stack = &thread_data->td.td_susp_tied_tasks;
   kmp_stack_block_t *stack_block = &task_stack->ts_first_block;
 
@@ -170,8 +170,8 @@ static void __kmp_push_task_stack(kmp_int32 gtid, kmp_info_t *thread,
   KMP_DEBUG_ASSERT(tied_task->td_flags.tasktype == TASK_TIED);
   KMP_DEBUG_ASSERT(task_stack->ts_top != NULL);
 
-  printf("__kmp_push_task_stack(enter): GTID: %d; THREAD: %p; TASK: %p\n",
-            gtid, thread, tied_task);
+//  printf("__kmp_push_task_stack(enter): GTID: %d; THREAD: %p; TASK: %p\n",
+//            gtid, thread, tied_task);
   KA_TRACE(20,
            ("__kmp_push_task_stack(enter): GTID: %d; THREAD: %p; TASK: %p\n",
             gtid, thread, tied_task));
@@ -233,8 +233,8 @@ static void __kmp_pop_task_stack(kmp_int32 gtid, kmp_info_t *thread,
   KMP_DEBUG_ASSERT(task_stack->ts_top != NULL);
   KMP_DEBUG_ASSERT(task_stack->ts_entries > 0);
 
-  printf("__kmp_pop_task_stack(enter): GTID: %d; THREAD: %p\n", gtid,
-                thread);
+//  printf("__kmp_pop_task_stack(enter): GTID: %d; THREAD: %p\n", gtid,
+//                thread);
   KA_TRACE(20, ("__kmp_pop_task_stack(enter): GTID: %d; THREAD: %p\n", gtid,
                 thread));
 
@@ -270,7 +270,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   kmp_int32 tid = __kmp_tid_from_gtid(gtid);
   kmp_thread_data_t *thread_data;
 
-  printf("__kmp_push_task: T#%d #TID=%d trying to push task %p.\n", gtid, tid, taskdata);
+//  printf("__kmp_push_task: T#%d #TID=%d trying to push task %p.\n", gtid, tid, taskdata);
   KA_TRACE(20,
            ("__kmp_push_task: T#%d trying to push task %p.\n", gtid, taskdata));
 
@@ -278,7 +278,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
     // untied task needs to increment counter so that the task structure is not
     // freed prematurely
     kmp_int32 counter = 1 + KMP_TEST_THEN_INC32(&taskdata->td_untied_count);
-    printf("Kmpc --> __kmp_push_task T#%d untied_count (%d) incremented for task %p.\n", gtid, counter, taskdata);
+  //  printf("Kmpc --> __kmp_push_task T#%d untied_count (%d) incremented for task %p.\n", gtid, counter, taskdata);
     KA_TRACE(
         20,
         ("__kmp_push_task: T#%d untied_count (%d) incremented for task %p\n",
@@ -287,7 +287,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
 
   // The first check avoids building task_team thread data if serialized
   if (taskdata->td_flags.task_serial) {
-    printf("Kmpc --> __kmp_push_task T#%d team serialized/ return TASK_NOT_PUSHED for task %p. \n", gtid, taskdata);
+  //  printf("Kmpc --> __kmp_push_task T#%d team serialized/ return TASK_NOT_PUSHED for task %p. \n", gtid, taskdata);
     KA_TRACE(20, ("__kmp_push_task: T#%d team serialized; returning "
                   "TASK_NOT_PUSHED for task %p\n",
                   gtid, taskdata));
@@ -298,7 +298,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   // immediate exec mode
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   if (!KMP_TASKING_ENABLED(task_team)) {
-  printf("__kmp_push_task: T#%d before __kmp_enable_tasking \n", gtid);
+  //printf("__kmp_push_task: T#%d before __kmp_enable_tasking \n", gtid);
     __kmp_enable_tasking(task_team, thread);
   }
   KMP_DEBUG_ASSERT(TCR_4(task_team->tt.tt_found_tasks) == TRUE);
@@ -315,9 +315,9 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   // Check if deque is full
   if (TCR_4(thread_data->td.td_deque_ntasks) >=
       TASK_DEQUE_SIZE(thread_data->td)) {
-     printf("__kmp_push_task: T#%d deque is full; returning "
-                  "TASK_NOT_PUSHED for task %p\n",
-                  gtid, taskdata);
+    // printf("__kmp_push_task: T#%d deque is full; returning "
+    //              "TASK_NOT_PUSHED for task %p\n",
+    //              gtid, taskdata);
     KA_TRACE(20, ("__kmp_push_task: T#%d deque is full; returning "
                   "TASK_NOT_PUSHED for task %p\n",
                   gtid, taskdata));
@@ -332,9 +332,9 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   if (TCR_4(thread_data->td.td_deque_ntasks) >=
       TASK_DEQUE_SIZE(thread_data->td)) {
     __kmp_release_bootstrap_lock(&thread_data->td.td_deque_lock);
-    printf("__kmp_push_task: T#%d deque is full on 2nd check; returning "
-                  "TASK_NOT_PUSHED for task %p\n",
-                  gtid, taskdata);
+  //  printf("__kmp_push_task: T#%d deque is full on 2nd check; returning "
+  //                "TASK_NOT_PUSHED for task %p\n",
+  //                gtid, taskdata);
     KA_TRACE(20, ("__kmp_push_task: T#%d deque is full on 2nd check; returning "
                   "TASK_NOT_PUSHED for task %p\n",
                   gtid, taskdata));
@@ -354,7 +354,7 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
   TCW_4(thread_data->td.td_deque_ntasks,
         TCR_4(thread_data->td.td_deque_ntasks) + 1); // Adjust task count
 
-    printf("Kmpc --> __kmp_push_task: T#%d returning TASK_SCCESSFULLY_PUSHED: task=%p ntask=%d head=%u tail=%u.\n", gtid, taskdata, thread_data->td.td_deque_ntasks, thread_data->td.td_deque_head, thread_data->td.td_deque_tail);
+  //  printf("Kmpc --> __kmp_push_task: T#%d returning TASK_SCCESSFULLY_PUSHED: task=%p ntask=%d head=%u tail=%u.\n", gtid, taskdata, thread_data->td.td_deque_ntasks, thread_data->td.td_deque_head, thread_data->td.td_deque_tail);
   KA_TRACE(20, ("__kmp_push_task: T#%d returning TASK_SUCCESSFULLY_PUSHED: "
                 "task=%p ntasks=%d head=%u tail=%u\n",
                 gtid, taskdata, thread_data->td.td_deque_ntasks,
@@ -370,11 +370,11 @@ static kmp_int32 __kmp_push_task(kmp_int32 gtid, kmp_task_t *task) {
 //
 // this_thr: thread structure to set current_task in.
 void __kmp_pop_current_task_from_thread(kmp_info_t *this_thr) {
-  printf("__kmp_pop_current_task_from_thread(enter): T#%d "
-                "this_thread=%p, curtask=%p, "
-                "curtask_parent=%p\n",
-                0, this_thr, this_thr->th.th_current_task,
-                this_thr->th.th_current_task->td_parent);
+  //printf("__kmp_pop_current_task_from_thread(enter): T#%d "
+  //              "this_thread=%p, curtask=%p, "
+  //              "curtask_parent=%p\n",
+  //              0, this_thr, this_thr->th.th_current_task,
+  //              this_thr->th.th_current_task->td_parent);
   KF_TRACE(10, ("__kmp_pop_current_task_from_thread(enter): T#%d "
                 "this_thread=%p, curtask=%p, "
                 "curtask_parent=%p\n",
@@ -400,11 +400,11 @@ void __kmp_push_current_task_to_thread(kmp_info_t *this_thr, kmp_team_t *team,
                                        int tid) {
   // current task of the thread is a parent of the new just created implicit
   // tasks of new team
-  printf("__kmp_push_current_task_to_thread(enter): T#%d this_thread=%p "
-                "curtask=%p "
-                "parent_task=%p\n",
-                tid, this_thr, this_thr->th.th_current_task,
-                team->t.t_implicit_task_taskdata[tid].td_parent);
+  //printf("__kmp_push_current_task_to_thread(enter): T#%d this_thread=%p "
+  //              "curtask=%p "
+  //              "parent_task=%p\n",
+  //              tid, this_thr, this_thr->th.th_current_task,
+  //              team->t.t_implicit_task_taskdata[tid].td_parent);
   KF_TRACE(10, ("__kmp_push_current_task_to_thread(enter): T#%d this_thread=%p "
                 "curtask=%p "
                 "parent_task=%p\n",
@@ -442,8 +442,8 @@ static void __kmp_task_start(kmp_int32 gtid, kmp_task_t *task,
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   kmp_info_t *thread = __kmp_threads[gtid];
 
-  printf("__kmp_task_start(enter): T#%d starting task %p: current_task=%p\n",
-            gtid, taskdata, current_task);
+  //printf("__kmp_task_start(enter): T#%d starting task %p: current_task=%p\n",
+  //          gtid, taskdata, current_task);
   KA_TRACE(10,
            ("__kmp_task_start(enter): T#%d starting task %p: current_task=%p\n",
             gtid, taskdata, current_task));
@@ -518,9 +518,9 @@ void __kmpc_omp_task_begin_if0(ident_t *loc_ref, kmp_int32 gtid,
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   kmp_taskdata_t *current_task = __kmp_threads[gtid]->th.th_current_task;
 
-  printf("__kmpc_omp_task_begin_if0(enter): T#%d loc=%p task=%p "
-                "current_task=%p\n",
-                gtid, loc_ref, taskdata, current_task);
+  //printf("__kmpc_omp_task_begin_if0(enter): T#%d loc=%p task=%p "
+  //              "current_task=%p\n",
+  //              gtid, loc_ref, taskdata, current_task);
   KA_TRACE(10, ("__kmpc_omp_task_begin_if0(enter): T#%d loc=%p task=%p "
                 "current_task=%p\n",
                 gtid, loc_ref, taskdata, current_task));
@@ -570,8 +570,8 @@ void __kmpc_omp_task_begin(ident_t *loc_ref, kmp_int32 gtid, kmp_task_t *task) {
 // thread: thread data structure of caller
 static void __kmp_free_task(kmp_int32 gtid, kmp_taskdata_t *taskdata,
                             kmp_info_t *thread) {
-  printf("__kmp_free_task: T#%d freeing data from task %p\n", gtid,
-                taskdata);
+  //printf("__kmp_free_task: T#%d freeing data from task %p\n", gtid,
+  //              taskdata);
   KA_TRACE(30, ("__kmp_free_task: T#%d freeing data from task %p\n", gtid,
                 taskdata));
 
@@ -606,9 +606,9 @@ static void __kmp_free_task_and_ancestors(kmp_int32 gtid,
                                           kmp_taskdata_t *taskdata,
                                           kmp_info_t *thread) {
 
- printf("__kmp_free_task_and_ancestors(enter): T#%d task %p complete "
-                  "and freeing itself\n",
-                  gtid, taskdata);
+ //printf("__kmp_free_task_and_ancestors(enter): T#%d task %p complete "
+ //                 "and freeing itself\n",
+ //                 gtid, taskdata);
 
 
 #if OMP_45_ENABLED
@@ -810,8 +810,8 @@ static void __kmp_task_finish(kmp_int32 gtid, kmp_task_t *task,
   // KMP_DEBUG_ASSERT( resumed_task->td_flags.executing == 0 );
   resumed_task->td_flags.executing = 1; // resume previous task
 
-  printf("__kmp_task_finish(exit): T#%d finished task %p, resuming task %p\n",
-           gtid, taskdata, resumed_task);
+  //printf("__kmp_task_finish(exit): T#%d finished task %p, resuming task %p\n",
+  //         gtid, taskdata, resumed_task);
   KA_TRACE(
       10, ("__kmp_task_finish(exit): T#%d finished task %p, resuming task %p\n",
            gtid, taskdata, resumed_task));
@@ -888,8 +888,8 @@ void __kmp_init_implicit_task(ident_t *loc_ref, kmp_info_t *this_thr,
                               kmp_team_t *team, int tid, int set_curr_task) {
   kmp_taskdata_t *task = &team->t.t_implicit_task_taskdata[tid];
 
-      printf("__kmp_init_implicit_task(enter): T#:%d team=%p task=%p, reinit=%s\n",
-       tid, team, task, set_curr_task ? "TRUE" : "FALSE");
+      //printf("__kmp_init_implicit_task(enter): T#:%d team=%p task=%p, reinit=%s\n",
+       //tid, team, task, set_curr_task ? "TRUE" : "FALSE");
   KF_TRACE(
       10,
       ("__kmp_init_implicit_task(enter): T#:%d team=%p task=%p, reinit=%s\n",
@@ -993,9 +993,11 @@ static size_t __kmp_round_up_to_val(size_t size, size_t val) {
 // task_entry: Pointer to task code entry point generated by compiler.
 // returns: a pointer to the allocated kmp_task_t structure (task).
 kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
-                             kmp_tasking_flags_t *flags,
-                             size_t sizeof_kmp_task_t, size_t sizeof_shareds,
-                             kmp_routine_entry_t task_entry) {
+                            kmp_tasking_flags_t *flags,
+                            size_t sizeof_kmp_task_t, size_t sizeof_shareds,
+                            kmp_routine_entry_t task_entry, int32_t arg_num,
+                            void** args_base, void **args, int64_t *arg_sizes,
+                            int64_t *arg_types) {
   kmp_task_t *task;
   kmp_taskdata_t *taskdata;
   kmp_info_t *thread = __kmp_threads[gtid];
@@ -1181,6 +1183,13 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
   taskdata->td_depnode = NULL;
 #endif
 
+// htask stuff
+taskdata->arg_num = arg_num;
+taskdata->args_base = args_base;
+taskdata->args = args;
+taskdata->arg_sizes = arg_sizes;
+taskdata->arg_types = arg_types;
+
 // Only need to keep track of child task counts if team parallel and tasking not
 // serialized or if it is a proxy task
 #if OMP_45_ENABLED
@@ -1220,7 +1229,9 @@ kmp_task_t *__kmp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
 kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                                   kmp_int32 flags, size_t sizeof_kmp_task_t,
                                   size_t sizeof_shareds,
-                                  kmp_routine_entry_t task_entry, int isDev, int devId) {
+                                  kmp_routine_entry_t task_entry, int isDev, int devId,
+                                  int32_t arg_num, void** args_base, void **args,
+                                  int64_t *arg_sizes,  int64_t *arg_types) {
 
   printf("Kmpc --> __kmpc_omp_task_alloc says (enter): Execute task isDev %d on device %d\n",isDev, devId);
   kmp_task_t *retval;
@@ -1250,8 +1261,10 @@ kmp_task_t *__kmpc_omp_task_alloc(ident_t *loc_ref, kmp_int32 gtid,
                 sizeof_kmp_task_t, sizeof_shareds, task_entry));
 #endif
 
-  retval = __kmp_task_alloc(loc_ref, gtid, input_flags, sizeof_kmp_task_t,
-                            sizeof_shareds, task_entry);
+  retval = __kmp_task_alloc(loc_ref, gtid, input_flags,
+                            sizeof_kmp_task_t, sizeof_shareds,
+                            task_entry, arg_num, args_base, args,
+                            arg_sizes, arg_types);
 
   //printf("Kmpc -->  __kmpc_omp_task_alloc(exit): T#%d retval %p\n", gtid, retval);
 
@@ -1444,8 +1457,8 @@ static void __kmp_invoke_task(kmp_int32 gtid, kmp_task_t *task,
     }
   }
 #endif
-  //printf("__kmp_invoke_task(exit): T#%d completed task %p, resuming task %p\n",
-  //     gtid, taskdata, current_task);
+  printf("__kmp_invoke_task(exit): T#%d completed task %p, resuming task %p\n",
+       gtid, taskdata, current_task);
   KA_TRACE(
       30,
       ("__kmp_invoke_task(exit): T#%d completed task %p, resuming task %p\n",
@@ -1467,8 +1480,8 @@ kmp_int32 __kmpc_omp_task_parts(ident_t *loc_ref, kmp_int32 gtid,
                                 kmp_task_t *new_task) {
   kmp_taskdata_t *new_taskdata = KMP_TASK_TO_TASKDATA(new_task);
 
-  printf("__kmpc_omp_task_parts(enter): T#%d loc=%p task=%p\n", gtid,
-                loc_ref, new_taskdata);
+  //printf("__kmpc_omp_task_parts(enter): T#%d loc=%p task=%p\n", gtid,
+  //              loc_ref, new_taskdata);
   KA_TRACE(10, ("__kmpc_omp_task_parts(enter): T#%d loc=%p task=%p\n", gtid,
                 loc_ref, new_taskdata));
 
@@ -1520,11 +1533,11 @@ kmp_int32 __kmp_omp_task(kmp_int32 gtid, kmp_task_t *new_task,
 /* Should we execute the new task or queue it? For now, let's just always try to
    queue it.  If the queue fills up, then we'll execute it.  */
 #if OMP_45_ENABLED
-  printf("Kmpc --> __kmp_omp_task OMP_45_ENABLED. \n");
+  //printf("Kmpc --> __kmp_omp_task OMP_45_ENABLED. \n");
   if (new_taskdata->td_flags.proxy == TASK_PROXY ||
       __kmp_push_task(gtid, new_task) == TASK_NOT_PUSHED) // if cannot defer
 #else
-  printf("Kmpc --> __kmp_omp_task OMP_45_NOT_ENABLED. \n");
+  //printf("Kmpc --> __kmp_omp_task OMP_45_NOT_ENABLED. \n");
   if (__kmp_push_task(gtid, new_task) == TASK_NOT_PUSHED) // if cannot defer
 #endif
   { // Execute this task immediately
@@ -1573,7 +1586,7 @@ kmp_int32 __kmpc_omp_task(ident_t *loc_ref, kmp_int32 gtid,
 
   res = __kmp_omp_task(gtid, new_task, true);
 
-  //printf("Kmpc --> __kmpc_omp_task exitting. \n");
+  printf("Kmpc --> __kmpc_omp_task exitting. \n");
   KA_TRACE(10, ("__kmpc_omp_task(exit): T#%d returning "
                 "TASK_CURRENT_NOT_QUEUED: loc=%p task=%p\n",
                 gtid, loc_ref, new_taskdata));
@@ -1589,7 +1602,7 @@ kmp_int32 __kmpc_omp_taskwait(ident_t *loc_ref, kmp_int32 gtid) {
   KMP_SET_THREAD_STATE_BLOCK(TASKWAIT);
 
   KA_TRACE(10, ("__kmpc_omp_taskwait(enter): T#%d loc=%p\n", gtid, loc_ref));
-  printf("__kmpc_omp_taskwait(enter): T#%d loc=%p\n", gtid, loc_ref);
+  //printf("__kmpc_omp_taskwait(enter): T#%d loc=%p\n", gtid, loc_ref);
 
   if (__kmp_tasking_mode != tskm_immediate_exec) {
     thread = __kmp_threads[gtid];
@@ -1681,8 +1694,8 @@ kmp_int32 __kmpc_omp_taskyield(ident_t *loc_ref, kmp_int32 gtid, int end_part) {
   KMP_COUNT_BLOCK(OMP_TASKYIELD);
   KMP_SET_THREAD_STATE_BLOCK(TASKYIELD);
 
-  printf("__kmpc_omp_taskyield(enter): T#%d loc=%p end_part = %d\n",
-                gtid, loc_ref, end_part);
+  //printf("__kmpc_omp_taskyield(enter): T#%d loc=%p end_part = %d\n",
+  //              gtid, loc_ref, end_part);
   KA_TRACE(10, ("__kmpc_omp_taskyield(enter): T#%d loc=%p end_part = %d\n",
                 gtid, loc_ref, end_part));
 
@@ -1840,7 +1853,7 @@ void *__kmpc_task_reduction_init(int gtid, int num, void *data) {
 Get thread-specific location of data item
 */
 void *__kmpc_task_reduction_get_th_data(int gtid, void *tskgrp, void *data) {
-  printf("__kmpc_task_reduction_get_th_data\n");
+  //printf("__kmpc_task_reduction_get_th_data\n");
   kmp_info_t *thread = __kmp_threads[gtid];
   kmp_int32 nth = thread->th.th_team_nproc;
   if (nth == 1)
@@ -1894,7 +1907,7 @@ void *__kmpc_task_reduction_get_th_data(int gtid, void *tskgrp, void *data) {
 // Finalize task reduction.
 // Called from __kmpc_end_taskgroup()
 static void __kmp_task_reduction_fini(kmp_info_t *th, kmp_taskgroup_t *tg) {
-  printf("__kmp_task_reduction_fini\n");
+  //printf("__kmp_task_reduction_fini\n");
   kmp_int32 nth = th->th.th_team_nproc;
   KMP_DEBUG_ASSERT(nth > 1); // should not be called if nth == 1
   kmp_task_red_data_t *arr = (kmp_task_red_data_t *)tg->reduce_data;
@@ -1940,7 +1953,7 @@ void __kmpc_taskgroup(ident_t *loc, int gtid) {
   kmp_taskgroup_t *tg_new =
       (kmp_taskgroup_t *)__kmp_thread_malloc(thread, sizeof(kmp_taskgroup_t));
   KA_TRACE(10, ("__kmpc_taskgroup: T#%d loc=%p group=%p\n", gtid, loc, tg_new));
-  printf("__kmpc_taskgroup: T#%d loc=%p group=%p\n", gtid, loc, tg_new);
+  //printf("__kmpc_taskgroup: T#%d loc=%p group=%p\n", gtid, loc, tg_new);
   tg_new->count = 0;
   tg_new->cancel_request = cancel_noreq;
   tg_new->parent = taskdata->td_taskgroup;
@@ -1961,7 +1974,7 @@ void __kmpc_end_taskgroup(ident_t *loc, int gtid) {
   int thread_finished = FALSE;
 
   KA_TRACE(10, ("__kmpc_end_taskgroup(enter): T#%d loc=%p\n", gtid, loc));
-  printf("__kmpc_end_taskgroup(enter): T#%d loc=%p\n", gtid, loc);
+  //printf("__kmpc_end_taskgroup(enter): T#%d loc=%p\n", gtid, loc);
   KMP_DEBUG_ASSERT(taskgroup != NULL);
   KMP_SET_THREAD_STATE_BLOCK(TASKGROUP);
 
@@ -2543,10 +2556,6 @@ static void __kmp_enable_tasking(kmp_task_team_t *task_team,
   kmp_thread_data_t *threads_data;
   int nthreads, i, is_init_thread;
 
-  printf("Kmpc --> __kmp_enable_tasking(enter): T#%d\n",
-                __kmp_gtid_from_thread(this_thr));
-  printf("__kmp_enable_tasking(enter): T#%d\n",
-                __kmp_gtid_from_thread(this_thr));
   KA_TRACE(10, ("__kmp_enable_tasking(enter): T#%d\n",
                 __kmp_gtid_from_thread(this_thr)));
 
@@ -2564,8 +2573,8 @@ static void __kmp_enable_tasking(kmp_task_team_t *task_team,
     // Some other thread already set up the array.
 /*    printf("__kmp_enable_tasking(exit): T#%d: threads array already set up.\n",
          __kmp_gtid_from_thread(this_thr));*/
-    printf("__kmp_enable_tasking(exit): T#%d: threads array already set up.\n",
-         __kmp_gtid_from_thread(this_thr));
+//    printf("__kmp_enable_tasking(exit): T#%d: threads array already set up.\n",
+//         __kmp_gtid_from_thread(this_thr));
     KA_TRACE(
         20,
         ("__kmp_enable_tasking(exit): T#%d: threads array already set up.\n",
@@ -2598,9 +2607,6 @@ static void __kmp_enable_tasking(kmp_task_team_t *task_team,
 /*        printf("__kmp_enable_tasking: T#%d waking up thread T#%d\n",
                       __kmp_gtid_from_thread(this_thr),
                       __kmp_gtid_from_thread(thread));*/
-        printf("__kmp_enable_tasking: T#%d waking up thread T#%d\n",
-                      __kmp_gtid_from_thread(this_thr),
-                      __kmp_gtid_from_thread(thread));
         KF_TRACE(50, ("__kmp_enable_tasking: T#%d waking up thread T#%d\n",
                       __kmp_gtid_from_thread(this_thr),
                       __kmp_gtid_from_thread(thread)));
@@ -2609,9 +2615,6 @@ static void __kmp_enable_tasking(kmp_task_team_t *task_team,
 /*        printf("__kmp_enable_tasking: T#%d don't wake up thread T#%d\n",
                       __kmp_gtid_from_thread(this_thr),
                       __kmp_gtid_from_thread(thread));*/
-        printf("__kmp_enable_tasking: T#%d don't wake up thread T#%d\n",
-                      __kmp_gtid_from_thread(this_thr),
-                      __kmp_gtid_from_thread(thread));
         KF_TRACE(50, ("__kmp_enable_tasking: T#%d don't wake up thread T#%d\n",
                       __kmp_gtid_from_thread(this_thr),
                       __kmp_gtid_from_thread(thread)));
@@ -2684,8 +2687,8 @@ static void __kmp_alloc_task_deque(kmp_info_t *thread,
   KMP_DEBUG_ASSERT(thread_data->td.td_deque_head == 0);
   KMP_DEBUG_ASSERT(thread_data->td.td_deque_tail == 0);
 
-  printf("__kmp_alloc_task_deque: T#%d allocating deque[%d] for thread_data %p\n",
-       __kmp_gtid_from_thread(thread), INITIAL_TASK_DEQUE_SIZE, thread_data);
+ // printf("__kmp_alloc_task_deque: T#%d allocating deque[%d] for thread_data %p\n",
+ //      __kmp_gtid_from_thread(thread), INITIAL_TASK_DEQUE_SIZE, thread_data);
   KE_TRACE(
       10,
       ("__kmp_alloc_task_deque: T#%d allocating deque[%d] for thread_data %p\n",
@@ -2707,9 +2710,9 @@ static void __kmp_realloc_task_deque(kmp_info_t *thread,
   kmp_int32 size = TASK_DEQUE_SIZE(thread_data->td);
   kmp_int32 new_size = 2 * size;
 
-  printf("__kmp_realloc_task_deque: T#%d reallocating deque[from %d to "
-                "%d] for thread_data %p\n",
-                __kmp_gtid_from_thread(thread), size, new_size, thread_data);
+//  printf("__kmp_realloc_task_deque: T#%d reallocating deque[from %d to "
+//                "%d] for thread_data %p\n",
+//                __kmp_gtid_from_thread(thread), size, new_size, thread_data);
   KE_TRACE(10, ("__kmp_realloc_task_deque: T#%d reallocating deque[from %d to "
                 "%d] for thread_data %p\n",
                 __kmp_gtid_from_thread(thread), size, new_size, thread_data));
@@ -2734,7 +2737,7 @@ static void __kmp_realloc_task_deque(kmp_info_t *thread,
 // Deallocates a task deque for a particular thread. Happens at library
 // deallocation so don't need to reset all thread data fields.
 static void __kmp_free_task_deque(kmp_thread_data_t *thread_data) {
-  printf("Kmpc --> __kmp_free_task_deque entering\n");
+//  printf("Kmpc --> __kmp_free_task_deque entering\n");
   if (thread_data->td.td_deque != NULL) {
     __kmp_acquire_bootstrap_lock(&thread_data->td.td_deque_lock);
     TCW_4(thread_data->td.td_deque_ntasks, 0);
@@ -2760,7 +2763,7 @@ static void __kmp_free_task_deque(kmp_thread_data_t *thread_data) {
 // The current size is given by task_team -> tt.tt_max_threads.
 static int __kmp_realloc_task_threads_data(kmp_info_t *thread,
                                            kmp_task_team_t *task_team) {
-  printf("Kmpc --> __kmp_realloc_task_threads_data entering\n");
+//  printf("Kmpc --> __kmp_realloc_task_threads_data entering\n");
   kmp_thread_data_t **threads_data_p;
   kmp_int32 nthreads, maxthreads;
   int is_init_thread = FALSE;
@@ -2872,7 +2875,7 @@ static int __kmp_realloc_task_threads_data(kmp_info_t *thread,
 // Deallocates a threads_data array for a task team, including any attached
 // tasking deques.  Only occurs at library shutdown.
 static void __kmp_free_task_threads_data(kmp_task_team_t *task_team) {
-  printf("__kmp_free_task_threads_data\n");
+//  printf("__kmp_free_task_threads_data\n");
   __kmp_acquire_bootstrap_lock(&task_team->tt.tt_threads_lock);
   if (task_team->tt.tt_threads_data != NULL) {
     int i;
@@ -2894,8 +2897,8 @@ static kmp_task_team_t *__kmp_allocate_task_team(kmp_info_t *thread,
   kmp_task_team_t *task_team = NULL;
   int nthreads;
 
-  printf("__kmp_allocate_task_team: T#%d entering; team = %p\n",
-                (thread ? __kmp_gtid_from_thread(thread) : -1), team);
+ // printf("__kmp_allocate_task_team: T#%d entering; team = %p\n",
+ //               (thread ? __kmp_gtid_from_thread(thread) : -1), team);
   KA_TRACE(20, ("__kmp_allocate_task_team: T#%d entering; team = %p\n",
                 (thread ? __kmp_gtid_from_thread(thread) : -1), team));
 
@@ -2945,8 +2948,8 @@ static kmp_task_team_t *__kmp_allocate_task_team(kmp_info_t *thread,
 // Frees the task team associated with a specific thread, and adds it
 // to the global task team free list.
 void __kmp_free_task_team(kmp_info_t *thread, kmp_task_team_t *task_team) {
-  printf("__kmp_free_task_team: T#%d task_team = %p\n",
-                thread ? __kmp_gtid_from_thread(thread) : -1, task_team);
+//  printf("__kmp_free_task_team: T#%d task_team = %p\n",
+//                thread ? __kmp_gtid_from_thread(thread) : -1, task_team);
   KA_TRACE(20, ("__kmp_free_task_team: T#%d task_team = %p\n",
                 thread ? __kmp_gtid_from_thread(thread) : -1, task_team));
 
@@ -2966,7 +2969,7 @@ void __kmp_free_task_team(kmp_info_t *thread, kmp_task_team_t *task_team) {
 // Cannot do anything that needs a thread structure or gtid since they are
 // already gone.
 void __kmp_reap_task_teams(void) {
-  printf("__kmp_reap_task_teams\n");
+//  printf("__kmp_reap_task_teams\n");
   kmp_task_team_t *task_team;
 
   if (TCR_PTR(__kmp_free_task_teams) != NULL) {
@@ -2991,7 +2994,7 @@ void __kmp_reap_task_teams(void) {
 // trying to steal tasks.  Wait for each thread to unreference its task team.
 void __kmp_wait_to_unref_task_teams(void) {
 
-  printf("__kmp_wait_to_unref_task_teams\n");
+//  printf("__kmp_wait_to_unref_task_teams\n");
   kmp_info_t *thread;
   kmp_uint32 spins;
   int done;
@@ -3055,7 +3058,7 @@ void __kmp_wait_to_unref_task_teams(void) {
 // __kmp_task_team_setup:  Create a task_team for the current team, but use
 // an already created, unused one if it already exists.
 void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
-  printf("__kmp_task_team_setup\n");
+//  printf("__kmp_task_team_setup\n");
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
 
   // If this task_team hasn't been created yet, allocate it. It will be used in
@@ -3119,7 +3122,7 @@ void __kmp_task_team_setup(kmp_info_t *this_thr, kmp_team_t *team, int always) {
 // which happens just after the release phase of a team barrier.  This may be
 // called by any thread, but only for teams with # threads > 1.
 void __kmp_task_team_sync(kmp_info_t *this_thr, kmp_team_t *team) {
-  printf("__kmp_task_team_sync\n");
+//  printf("__kmp_task_team_sync\n");
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
 
   // Toggle the th_task_state field, to switch which task_team this thread
@@ -3147,7 +3150,7 @@ void __kmp_task_team_wait(
     kmp_info_t *this_thr,
     kmp_team_t *team USE_ITT_BUILD_ARG(void *itt_sync_obj), int wait) {
   kmp_task_team_t *task_team = team->t.t_task_team[this_thr->th.th_task_state];
-  printf("__kmp_task_team_wait\n");
+//  printf("__kmp_task_team_wait\n");
   KMP_DEBUG_ASSERT(__kmp_tasking_mode != tskm_immediate_exec);
   KMP_DEBUG_ASSERT(task_team == this_thr->th.th_task_team);
 
@@ -3191,7 +3194,7 @@ void __kmp_task_team_wait(
 // barrier. It is a full barrier itself, which unfortunately turns regular
 // barriers into double barriers and join barriers into 1 1/2 barriers.
 void __kmp_tasking_barrier(kmp_team_t *team, kmp_info_t *thread, int gtid) {
-  printf("__kmp_tasking_barrier\n");
+//  printf("__kmp_tasking_barrier\n");
   volatile kmp_uint32 *spin = RCAST(
       volatile kmp_uint32 *,
       &team->t.t_task_team[thread->th.th_task_state]->tt.tt_unfinished_threads);
@@ -3233,8 +3236,8 @@ static bool __kmp_give_task(kmp_info_t *thread, kmp_int32 tid, kmp_task_t *task,
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   kmp_task_team_t *task_team = taskdata->td_task_team;
 
-  printf("__kmp_give_task: trying to give task %p to thread %d.\n",
-                taskdata, tid);
+//  printf("__kmp_give_task: trying to give task %p to thread %d.\n",
+//                taskdata, tid);
   KA_TRACE(20, ("__kmp_give_task: trying to give task %p to thread %d.\n",
                 taskdata, tid));
 
@@ -3339,7 +3342,7 @@ static void __kmp_first_top_half_finish_proxy(kmp_taskdata_t *taskdata) {
 }
 
 static void __kmp_second_top_half_finish_proxy(kmp_taskdata_t *taskdata) {
-  printf("__kmp_second_top_half_finish_proxy\n");
+//  printf("__kmp_second_top_half_finish_proxy\n");
   kmp_int32 children = 0;
 
   // Predecrement simulated by "- 1" calculation
@@ -3352,7 +3355,7 @@ static void __kmp_second_top_half_finish_proxy(kmp_taskdata_t *taskdata) {
 }
 
 static void __kmp_bottom_half_finish_proxy(kmp_int32 gtid, kmp_task_t *ptask) {
-  printf("__kmp_bottom_half_finish_proxy\n");
+//  printf("__kmp_bottom_half_finish_proxy\n");
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(ptask);
   kmp_info_t *thread = __kmp_threads[gtid];
 
@@ -3380,8 +3383,8 @@ team. Run first and bottom halves directly.
 void __kmpc_proxy_task_completed(kmp_int32 gtid, kmp_task_t *ptask) {
   KMP_DEBUG_ASSERT(ptask != NULL);
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(ptask);
-  printf("__kmp_proxy_task_completed(enter): T#%d proxy task %p completing\n",
-           gtid, taskdata);
+//  printf("__kmp_proxy_task_completed(enter): T#%d proxy task %p completing\n",
+//           gtid, taskdata);
   KA_TRACE(
       10, ("__kmp_proxy_task_completed(enter): T#%d proxy task %p completing\n",
            gtid, taskdata));
@@ -3462,8 +3465,8 @@ kmp_task_t *__kmp_task_dup_alloc(kmp_info_t *thread, kmp_task_t *task_src) {
   size_t shareds_offset;
   size_t task_size;
 
-  printf("__kmp_task_dup_alloc(enter): Th %p, source task %p\n", thread,
-                task_src);
+//  printf("__kmp_task_dup_alloc(enter): Th %p, source task %p\n", thread,
+//                task_src);
   KA_TRACE(10, ("__kmp_task_dup_alloc(enter): Th %p, source task %p\n", thread,
                 task_src));
   taskdata_src = KMP_TASK_TO_TASKDATA(task_src);
@@ -3563,10 +3566,10 @@ void __kmp_taskloop_linear(ident_t *loc, int gtid, kmp_task_t *task,
   KMP_DEBUG_ASSERT(tc == num_tasks * grainsize + extras);
   KMP_DEBUG_ASSERT(num_tasks > extras);
   KMP_DEBUG_ASSERT(num_tasks > 0);
-  printf("__kmp_taskloop_linear: T#%d: %lld tasks, grainsize %lld, "
-                "extras %lld, i=%lld,%lld(%d)%lld, dup %p\n",
-                gtid, num_tasks, grainsize, extras, lower, upper, ub_glob, st,
-                task_dup);
+//  printf("__kmp_taskloop_linear: T#%d: %lld tasks, grainsize %lld, "
+//                "extras %lld, i=%lld,%lld(%d)%lld, dup %p\n",
+//                gtid, num_tasks, grainsize, extras, lower, upper, ub_glob, st,
+//                task_dup);
   KA_TRACE(20, ("__kmp_taskloop_linear: T#%d: %lld tasks, grainsize %lld, "
                 "extras %lld, i=%lld,%lld(%d)%lld, dup %p\n",
                 gtid, num_tasks, grainsize, extras, lower, upper, ub_glob, st,
@@ -3656,10 +3659,10 @@ int __kmp_taskloop_task(int gtid, void *ptask) {
 #if KMP_DEBUG
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   KMP_DEBUG_ASSERT(task != NULL);
-  printf("__kmp_taskloop_task: T#%d, task %p: %lld tasks, grainsize"
-                " %lld, extras %lld, i=%lld,%lld(%d), dup %p\n",
-                gtid, taskdata, num_tasks, grainsize, extras, *lb, *ub, st,
-                task_dup);
+//  printf("__kmp_taskloop_task: T#%d, task %p: %lld tasks, grainsize"
+//                " %lld, extras %lld, i=%lld,%lld(%d), dup %p\n",
+//                gtid, taskdata, num_tasks, grainsize, extras, *lb, *ub, st,
+//                task_dup);
   KA_TRACE(20, ("__kmp_taskloop_task: T#%d, task %p: %lld tasks, grainsize"
                 " %lld, extras %lld, i=%lld,%lld(%d), dup %p\n",
                 gtid, taskdata, num_tasks, grainsize, extras, *lb, *ub, st,
@@ -3702,10 +3705,10 @@ void __kmp_taskloop_recur(ident_t *loc, int gtid, kmp_task_t *task,
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   KMP_DEBUG_ASSERT(task != NULL);
   KMP_DEBUG_ASSERT(num_tasks > num_t_min);
-  printf("__kmp_taskloop_recur: T#%d, task %p: %lld tasks, grainsize"
-                " %lld, extras %lld, i=%lld,%lld(%d), dup %p\n",
-                gtid, taskdata, num_tasks, grainsize, extras, *lb, *ub, st,
-                task_dup);
+//  printf("__kmp_taskloop_recur: T#%d, task %p: %lld tasks, grainsize"
+//                " %lld, extras %lld, i=%lld,%lld(%d), dup %p\n",
+//                gtid, taskdata, num_tasks, grainsize, extras, *lb, *ub, st,
+//                task_dup);
   KA_TRACE(20, ("__kmp_taskloop_recur: T#%d, task %p: %lld tasks, grainsize"
                 " %lld, extras %lld, i=%lld,%lld(%d), dup %p\n",
                 gtid, taskdata, num_tasks, grainsize, extras, *lb, *ub, st,
@@ -3806,9 +3809,9 @@ void __kmpc_taskloop(ident_t *loc, int gtid, kmp_task_t *task, int if_val,
   kmp_taskdata_t *taskdata = KMP_TASK_TO_TASKDATA(task);
   KMP_DEBUG_ASSERT(task != NULL);
 
-  printf("__kmpc_taskloop: T#%d, task %p, lb %lld, ub %lld, st %lld, "
-                "grain %llu(%d), dup %p\n",
-                gtid, taskdata, *lb, *ub, st, grainsize, sched, task_dup);
+//  printf("__kmpc_taskloop: T#%d, task %p, lb %lld, ub %lld, st %lld, "
+//                "grain %llu(%d), dup %p\n",
+//                gtid, taskdata, *lb, *ub, st, grainsize, sched, task_dup);
   KA_TRACE(20, ("__kmpc_taskloop: T#%d, task %p, lb %lld, ub %lld, st %lld, "
                 "grain %llu(%d), dup %p\n",
                 gtid, taskdata, *lb, *ub, st, grainsize, sched, task_dup));
