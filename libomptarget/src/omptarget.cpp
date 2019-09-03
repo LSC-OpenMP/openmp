@@ -51,7 +51,8 @@ enum StaticDeviceId {
   MPI      = 9004,
   OPENCL   = 9005,
   HARP2SIM = 9006,
-  AWSF1    = 9007
+  AWSF1    = 9007,
+  ALVEO    = 9008
 };
 
 // List of all plugins that can support offloading.
@@ -63,7 +64,8 @@ static const char *RTLNames[] = {
     /* SmartNIC target      */ "libomptarget.rtl.smartnic.so",
     /* Intel HARP target    */ "libomptarget.rtl.harp.so",
     /* Intel HARPSIM target */ "libomptarget.rtl.harpsim.so",
-    /* AWS EC2 F1 target    */ "libomptarget.rtl.awsf1.so"};
+    /* AWS EC2 F1 target    */ "libomptarget.rtl.awsf1.so",
+    /* Xilinx Alveo target  */ "libomptarget.rtl.alveo.so"};
 
 // forward declarations
 struct RTLInfoTy;
@@ -361,6 +363,8 @@ void RTLsTy::LoadRTLs() {
       R.staticDeviceId = HARP2SIM;
     } else if (strcmp(Name, "libomptarget.rtl.awsf1.so") == 0) {
       R.staticDeviceId = AWSF1;
+    } else if (strcmp(Name, "libomptarget.rtl.alveo.so") == 0) {
+      R.staticDeviceId = ALVEO;
     }
 
 #ifdef OMPTARGET_DEBUG
