@@ -70,9 +70,7 @@ struct __tgt_configuration {
 struct __tgt_offload_entry {
   void *addr;   // Pointer to the offload entry info (function or global)
   char *name;   // Name of the function or global
-  char *module; // Name of module to offloading if is an FPGA.
   size_t size;  // Size of the entry info (0 if it is a function)
-  int32_t check; // Flags associated with the check feature.
   int32_t flags; // Flags associated with the entry, e.g. 'link'.
   int32_t reserved; // Reserved, to be used by the runtime library.
 };
@@ -193,6 +191,10 @@ void __kmpc_push_target_tripcount(int64_t device_id, uint64_t loop_tripcount);
 
 // check feature: compare result between device and host.
 void __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size);
+
+void __tgt_set_implements(char *data);
+
+void __tgt_set_check(int32_t check_flags);
 
 #ifdef __cplusplus
 }

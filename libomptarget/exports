@@ -13,6 +13,8 @@ VERS1.0 {
     __tgt_target_nowait;
     __tgt_target_teams_nowait;
     __tgt_check_compare_variable;
+    __tgt_set_implements;
+    __tgt_set_check;
     omp_get_num_devices;
     omp_get_initial_device;
     omp_target_alloc;

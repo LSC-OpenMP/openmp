@@ -42,6 +42,9 @@ static int DebugLevel = 0;
 #define INF_REF_CNT (LONG_MAX>>1) // leave room for additions/subtractions
 #define CONSIDERED_INF(x) (x > (INF_REF_CNT>>1))
 
+char*   implements_function;
+int32_t has_check;
+
 // user could choose always the same device even if the number
 // of devices change.
 enum StaticDeviceId {
@@ -405,7 +408,8 @@ void RTLsTy::LoadRTLs() {
     if (R.staticDeviceId == SMARTNIC |
         R.staticDeviceId == HARP2 |
         R.staticDeviceId == HARP2SIM |
-        R.staticDeviceId == AWSF1) {
+        R.staticDeviceId == AWSF1 |
+        R.staticDeviceId == ALVEO) {
       if (!(*((void**) &R.set_module) = dlsym(
                 dynlib_handle, "__tgt_rtl_set_module")))
         continue;
@@ -1997,15 +2001,11 @@ static int target(int64_t device_id, void *host_ptr, int32_t arg_num,
   if (Device.RTL->staticDeviceId == SMARTNIC ||
     Device.RTL->staticDeviceId == HARP2 ||
     Device.RTL->staticDeviceId == HARP2SIM ||
-    Device.RTL->staticDeviceId == AWSF1) {
+    Device.RTL->staticDeviceId == AWSF1 ||
+    Device.RTL->staticDeviceId == ALVEO) {
 
-    Device.RTL->set_module(TargetTable->EntriesBegin[TM->Index].module);
+    Device.RTL->set_module((void *) implements_function);
   }
-
-  // has check feature
-  int has_check = 0;
-  if (1 == TargetTable->EntriesBegin[TM->Index].check)
-    has_check = 1;
 
   // Move data to device.
   int rc = target_data_begin(Device, arg_num, args_base, args, arg_sizes,
@@ -2288,5 +2288,13 @@ __tgt_check_compare_variable(void *host_ptr, void *tgt_ptr, size_t size) {
       printf("\n[HardCloud] check : FAIL\n");
     }
   }
+}
+
+EXTERN void __tgt_set_implements(char *data) {
+  implements_function = data;
+}
+
+EXTERN void __tgt_set_check(int32_t check_flags) {
+  has_check = check_flags;
 }
 
