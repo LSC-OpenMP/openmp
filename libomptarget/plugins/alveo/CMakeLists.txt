@@ -12,28 +12,39 @@
 ##===----------------------------------------------------------------------===##
 if(LIBOMPTARGET_DEP_LIBELF_FOUND)
 if(LIBOMPTARGET_DEP_LIBFFI_FOUND)
+if(LIBOMPTARGET_DEP_XILINX_VIVADO_FOUND)
+if(LIBOMPTARGET_DEP_XILINX_SDX_FOUND)
+if(LIBOMPTARGET_DEP_XILINX_XRT_FOUND)
   libomptarget_say("Building Xilinx Alveo U200/U250 offloading plugin.")
 
   # Define the suffix for the runtime messaging dumps.
   add_definitions(-DTARGET_NAME=ALVEO)
 
-  message(STATUS "the before value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
-  if (NOT DEFINED ENV{SDX_PLATFORM})
-    set(ENV{SDX_PLATFORM} "xilinx_aws-vu9p-f1-04261818_dynamic_5_0")
-  endif()
-  message(STATUS "the after value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
-    
+  # CXXFLAGS += -DSDX_PLATFORM=$(SDX_PLATFORM) -D__USE_XOPEN2K8 -I/opt/xilinx/xrt/include/ -I/local/tools/Xilinx/Vivado/2018.3/include/ -O0 -g -Wall -c -fmessage-length=0 -std=c++14
+  # LDFLAGS += -lxilinxopencl -lpthread -lrt -lstdc++ -lmpfr -lgmp
+  # -lhlsmc++-GCC46
+  # -lIp_floating_point_v7_0_bitacc_cmodel
+  # -lIp_xfft_v9_1_bitacc_cmodel
+  # -lIp_fir_compiler_v7_2_bitacc_cmodel
+  # -lIp_dds_compiler_v6_0_bitacc_cmodel
+  # -L/opt/xilinx/xrt/lib/ -L$(XILINX_VIVADO)/lnx64/tools/fpo_v7_0 -L$(XILINX_VIVADO)/lnx64/lib/csim -L$(XILINX_VIVADO)/lnx64/tools/dds_v6_0 -L$(XILINX_VIVADO)/lnx64/tools/fir_v7_0 -L$(XILINX_VIVADO)/lnx64/tools/fft_v9_1 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/lib/csim -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/fpo_v7_0 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/fft_v9_1 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/fir_v7_0 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/dds_v6_0
+
+  set(ENV{SDX_PLATFORM} "xilinx_u250_xdma_201830_2")
+
   add_definitions(-DSDX_PLATFORM=$ENV{SDX_PLATFORM})
   add_definitions(-D__USE_XOPEN2K8)
 
   if(LIBOMPTARGET_CMAKE_BUILD_TYPE MATCHES debug)
-    add_definitions(-DAWSF1_ERROR_REPORT)
+    add_definitions(-DALVEO_ERROR_REPORT)
   endif()
- 
+
   message(STATUS "the value of SDX_PLATFORM: " $ENV{SDX_PLATFORM})
 
   include_directories(${LIBOMPTARGET_DEP_LIBELF_INCLUDE_DIRS})
   include_directories(${LIBOMPTARGET_DEP_LIBFFI_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_XILINX_VIVADO_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_XILINX_SDX_INCLUDE_DIRS})
+  include_directories(${LIBOMPTARGET_DEP_XILINX_XRT_INCLUDE_DIRS})
 
   add_library(omptarget.rtl.alveo SHARED
               src/util/alveo_generic_app.cpp
@@ -50,13 +61,32 @@ if(LIBOMPTARGET_DEP_LIBFFI_FOUND)
   target_link_libraries(omptarget.rtl.alveo
     ${LIBOMPTARGET_DEP_LIBFFI_LIBRARIES}
     ${LIBOMPTARGET_DEP_LIBELF_LIBRARIES}
+    ${LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES}
+    ${LIBOMPTARGET_DEP_XILINX_XRT_LIBRARIES}
     pthread
     rt
     dl
+    stdc++
+    mpfr
+    gmp
+    # hlsmc++-GCC46
+    # Ip_floating_point_v7_0_bitacc_cmodel
+    # Ip_xfft_v9_1_bitacc_cmodel
+    # Ip_fir_compiler_v7_2_bitacc_cmodel
+    # Ip_dds_compiler_v6_0_bitacc_cmodel
     "-fmessage-length=0 -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
 
   # Report to the parent scope that we are building a plugin for Xilinx Alveo U200/U250.
   set(LIBOMPTARGET_SYSTEM_TARGETS "${LIBOMPTARGET_SYSTEM_TARGETS} x86_64" PARENT_SCOPE)
+else(LIBOMPTARGET_DEP_XILINX_XRT_FOUND)
+  libomptarget_say("Not building Xilinx Alveo U200/U250 offloading plugin: Xilinx XRT tools not found.")
+endif(LIBOMPTARGET_DEP_XILINX_XRT_FOUND)
+else(LIBOMPTARGET_DEP_XILINX_SDX_FOUND)
+  libomptarget_say("Not building Xilinx Alveo U200/U250 offloading plugin: Xilinx SDx tools not found.")
+endif(LIBOMPTARGET_DEP_XILINX_SDX_FOUND)
+else(LIBOMPTARGET_DEP_XILINX_VIVADO_FOUND)
+  libomptarget_say("Not building Xilinx Alveo U200/U250 offloading plugin: Xilinx Vivado tools not found.")
+endif(LIBOMPTARGET_DEP_XILINX_VIVADO_FOUND)
 else(LIBOMPTARGET_DEP_LIBFFI_FOUND)
   libomptarget_say("Not building Xilinx Alveo U200/U250 offloading plugin: libffi dependency not found.")
 endif(LIBOMPTARGET_DEP_LIBFFI_FOUND)

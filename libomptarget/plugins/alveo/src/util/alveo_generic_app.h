@@ -11,6 +11,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef ALVEO_GENERIC_APP_H_
+#define ALVEO_GENERIC_APP_H_
+
 #include <string>
 #include <cstring>
 #include <deque>
@@ -53,3 +56,6 @@ public:
   int run();    ///< Return 0 if success
   int program(const char *module);
 };
+
+#endif // ALVEO_GENERIC_APP_H_
+

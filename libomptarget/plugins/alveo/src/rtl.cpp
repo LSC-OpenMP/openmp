@@ -165,7 +165,7 @@ int32_t __tgt_rtl_set_module(void* module) {
 int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *image) {
   uint32_t is_valid_binary = elf_check_machine(image, EM_X86_64, 9008);
 
-  DP("[alveo] __tgt_rtl_is_valid_binary\n");
+  DP("[alveo] __tgt_rtl_is_valid_binary %d\n", is_valid_binary);
 
   return is_valid_binary;
 }

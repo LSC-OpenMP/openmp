@@ -16,19 +16,19 @@
 # libffi : required to launch target kernels given function and argument
 #          pointers.
 # CUDA : required to control offloading to NVIDIA GPUs.
-
+#
 # Intel AAL
 # Intel AAL SDK: required to control offloading to Intel HARP FPGAs.
-
+#
 # Intel OPAE
 # Intel OPAE: required to control offloading to Intel HARP FPGAs.
 # Intel OPAE ASE + BBB_CCI_MPF: required to control Intel ASE.
 # UUID : required by OPAE
 # boost program_options : required by OPAE
 # JSON-C : required by OPAE
-
-
-# Xilinx AWS F1 
+#
+# Xilinx AWS F1
+# Xilinx Alveo U200/U250
 
 include (FindPackageHandleStandardArgs)
 include (FindUUID)
@@ -415,6 +415,7 @@ find_path (
     /usr/local/include
     /opt/local/include
     /sw/include
+    ${XILINX_VIVADO}/include
     ENV CPATH)
 
 find_package_handle_standard_args(
@@ -436,7 +437,7 @@ find_path (
     /usr/include
     /usr/local/include
     /opt/local/include
-    /sw/include
+    ${XILINX_SDX}/include
     ENV CPATH)
 
 find_library (
@@ -447,19 +448,7 @@ find_library (
     /usr/lib
     /usr/local/lib
     /opt/local/lib
-    /sw/lib
-    ENV LIBRARY_PATH
-    ENV LD_LIBRARY_PATH)
-
-find_library ( 
-    LIBOMPTARGET_DEP_XILINX_SDX_XILINXOPENCL_LIBRARY
-  NAMES
-    xilinxopencl
-  PATHS
-    /usr/lib
-    /usr/local/lib
-    /opt/local/lib
-    /sw/lib
+    ${XILINX_SDX}/lib/lnx64.o/Default
     ENV LIBRARY_PATH
     ENV LD_LIBRARY_PATH)
 
@@ -480,3 +469,44 @@ find_package_handle_standard_args(
 mark_as_advanced(
   LIBOMPTARGET_DEP_XILINX_SDX_INCLUDE_DIRS
   LIBOMPTARGET_DEP_XILINX_SDX_LIBRARIES)
+
+################################################################################
+# Looking for Xilinx XRT ...
+################################################################################
+find_path (
+    LIBOMPTARGET_DEP_XILINX_XRT_INCLUDE_DIRS
+  NAMES
+    xclhal2.h
+  PATHS
+    /usr/include
+    /usr/local/include
+    /opt/xilinx/xrt/include
+    ${XILINX_XRT}/include
+    ENV CPATH)
+
+find_library (
+  LIBOMPTARGET_DEP_XILINX_XRT_LIBRARY
+  NAMES
+    xilinxopencl
+  PATHS
+    /usr/lib
+    /usr/local/lib
+    /opt/local/lib
+    ${XILINX_XRT}/lib
+    ENV LIBRARY_PATH
+    ENV LD_LIBRARY_PATH)
+
+set(LIBOMPTARGET_DEP_XILINX_XRT_LIBRARIES
+  ${LIBOMPTARGET_DEP_XILINX_XRT_LIBRARIES}
+  ${LIBOMPTARGET_DEP_XILINX_XRT_LIBRARY})
+
+find_package_handle_standard_args(
+  LIBOMPTARGET_DEP_XILINX_XRT
+  DEFAULT_MSG
+  LIBOMPTARGET_DEP_XILINX_XRT_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_XILINX_XRT_LIBRARIES)
+
+mark_as_advanced(
+  LIBOMPTARGET_DEP_XILINX_XRT_INCLUDE_DIRS
+  LIBOMPTARGET_DEP_XILINX_XRT_LIBRARIES)
+

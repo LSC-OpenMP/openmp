@@ -14,19 +14,17 @@
 #include "alveo_generic_app.h"
 #include "utils.h"
 
-// int h_axi00_ptr0_input[MAX_LENGTH]; // host memory for input vector
-// int h_axi00_ptr0_output[MAX_LENGTH];
-//
-// char *xclbin;
+int h_axi00_ptr0_input[MAX_LENGTH];  // host memory for input vector
+int h_axi00_ptr0_output[MAX_LENGTH];
+
+char *xclbin;
 
 AlveoGenericApp::AlveoGenericApp() {}
 
 AlveoGenericApp::~AlveoGenericApp() {}
 
 int AlveoGenericApp::init() {
-  init_util();
-
-  return 0;
+  return init_util();
 }
 
 void* AlveoGenericApp::alloc_buffer(uint64_t size) {
@@ -57,8 +55,6 @@ int AlveoGenericApp::program(const char *module) {
 }
 
 int AlveoGenericApp::run() {
-    run_target();
-
-    return 0;
+    return run_target();
 }
 
