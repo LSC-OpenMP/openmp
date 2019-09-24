@@ -8,6 +8,9 @@ cl_context       context;      // compute context
 cl_command_queue commands;     // compute command queue
 cl_program       program;      // compute programs
 cl_kernel        kernel;       // compute kernel
+cl_mem_ext_ptr_t mem_ext;      // define memory bank
+
+int counter_mem_flags;
 
 char cl_platform_vendor[1001];
 char target_device_name[1001] = TARGET_DEVICE;
@@ -209,11 +212,21 @@ int init_util() {
     return OFFLOAD_FAIL;
   }
 
+  mem_ext.obj = NULL;
+  mem_ext.param = kernel;
+
+  counter_mem_flags = 3;
+
   return OFFLOAD_SUCCESS;
 }
 
 void* data_alloc(int size) {
-  cl_mem dt = clCreateBuffer(context,  CL_MEM_READ_WRITE,  size, NULL, NULL);
+  mem_ext.flags = counter_mem_flags;
+
+  counter_mem_flags = counter_mem_flags - 1;
+
+  cl_mem dt = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,
+      size, &mem_ext, NULL);
 
   if (!(dt)) {
     printf("Error: Failed to allocate device memory!\n");
@@ -227,7 +240,8 @@ void* data_alloc(int size) {
 }
 
 void data_submit(void *tgt_ptr, void *hst_ptr, int64_t size) {
-  err = clEnqueueWriteBuffer(commands, (cl_mem)tgt_ptr, CL_TRUE, 0, size, hst_ptr, 0, NULL, NULL);
+  err = clEnqueueWriteBuffer(commands, (cl_mem) tgt_ptr, CL_TRUE, 0, sizeof(char) * size,
+      hst_ptr, 0, NULL, NULL);
 
   if (err != CL_SUCCESS) {
     printf("Error: Failed to submit data. tgt_ptr %p, hst_ptr %p, size %d!\n", tgt_ptr, hst_ptr, size);
@@ -253,6 +267,7 @@ int run_target() {
     args_counter++;
   }
 
+  args_counter = 3;
   for(auto ptrs : clmem_ptrs) {
     err = clSetKernelArg(kernel, args_counter, sizeof(cl_mem), &ptrs);
 
@@ -263,7 +278,7 @@ int run_target() {
       return OFFLOAD_FAIL;
     }
 
-    args_counter++;
+    args_counter--;
   }
 
   // Execute the kernel over the entire range of our 1d input data set
@@ -288,7 +303,7 @@ void data_retrieve(void *hst_ptr, void *tgt_ptr, int size) {
   clFinish(commands);
 
   err = 0;
-  err |= clEnqueueReadBuffer(commands, (cl_mem )tgt_ptr, CL_TRUE, 0, size, hst_ptr, 0, NULL, &readevent);
+  err |= clEnqueueReadBuffer(commands, (cl_mem) tgt_ptr, CL_TRUE, 0, size, hst_ptr, 0, NULL, &readevent);
 
   if (err != CL_SUCCESS) {
     printf("Error: Failed to read output array! %d\n", err);
@@ -296,6 +311,10 @@ void data_retrieve(void *hst_ptr, void *tgt_ptr, int size) {
   }
 
   clWaitForEvents(1, &readevent);
+
+  for (int i = 0; i < size; i++) {
+    printf("[retrieve] hst_ptr[%d] = %x\n", i, ((unsigned char*) hst_ptr)[i]);
+  }
 }
 
 void data_delete(void *tgt_ptr) {

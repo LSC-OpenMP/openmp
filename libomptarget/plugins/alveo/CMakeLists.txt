@@ -20,16 +20,7 @@ if(LIBOMPTARGET_DEP_XILINX_XRT_FOUND)
   # Define the suffix for the runtime messaging dumps.
   add_definitions(-DTARGET_NAME=ALVEO)
 
-  # CXXFLAGS += -DSDX_PLATFORM=$(SDX_PLATFORM) -D__USE_XOPEN2K8 -I/opt/xilinx/xrt/include/ -I/local/tools/Xilinx/Vivado/2018.3/include/ -O0 -g -Wall -c -fmessage-length=0 -std=c++14
-  # LDFLAGS += -lxilinxopencl -lpthread -lrt -lstdc++ -lmpfr -lgmp
-  # -lhlsmc++-GCC46
-  # -lIp_floating_point_v7_0_bitacc_cmodel
-  # -lIp_xfft_v9_1_bitacc_cmodel
-  # -lIp_fir_compiler_v7_2_bitacc_cmodel
-  # -lIp_dds_compiler_v6_0_bitacc_cmodel
-  # -L/opt/xilinx/xrt/lib/ -L$(XILINX_VIVADO)/lnx64/tools/fpo_v7_0 -L$(XILINX_VIVADO)/lnx64/lib/csim -L$(XILINX_VIVADO)/lnx64/tools/dds_v6_0 -L$(XILINX_VIVADO)/lnx64/tools/fir_v7_0 -L$(XILINX_VIVADO)/lnx64/tools/fft_v9_1 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/lib/csim -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/fpo_v7_0 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/fft_v9_1 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/fir_v7_0 -Wl,-rpath,$(XILINX_VIVADO)/lnx64/tools/dds_v6_0
-
-  set(ENV{SDX_PLATFORM} "xilinx_u250_xdma_201830_2")
+  set(ENV{SDX_PLATFORM} "xilinx_u200_xdma_201830_2")
 
   add_definitions(-DSDX_PLATFORM=$ENV{SDX_PLATFORM})
   add_definitions(-D__USE_XOPEN2K8)
@@ -69,11 +60,6 @@ if(LIBOMPTARGET_DEP_XILINX_XRT_FOUND)
     stdc++
     mpfr
     gmp
-    # hlsmc++-GCC46
-    # Ip_floating_point_v7_0_bitacc_cmodel
-    # Ip_xfft_v9_1_bitacc_cmodel
-    # Ip_fir_compiler_v7_2_bitacc_cmodel
-    # Ip_dds_compiler_v6_0_bitacc_cmodel
     "-fmessage-length=0 -Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/../exports")
 
   # Report to the parent scope that we are building a plugin for Xilinx Alveo U200/U250.
