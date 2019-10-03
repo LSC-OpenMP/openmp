@@ -311,10 +311,6 @@ void data_retrieve(void *hst_ptr, void *tgt_ptr, int size) {
   }
 
   clWaitForEvents(1, &readevent);
-
-  for (int i = 0; i < size; i++) {
-    printf("[retrieve] hst_ptr[%d] = %x\n", i, ((unsigned char*) hst_ptr)[i]);
-  }
 }
 
 void data_delete(void *tgt_ptr) {
