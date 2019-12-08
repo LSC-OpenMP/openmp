@@ -24,7 +24,7 @@ AlveoGenericApp::AlveoGenericApp() {}
 AlveoGenericApp::~AlveoGenericApp() {}
 
 int AlveoGenericApp::init() {
-  return init_util();
+  return 0;
 }
 
 void* AlveoGenericApp::alloc_buffer(uint64_t size) {
@@ -51,7 +51,7 @@ int AlveoGenericApp::finish() {
 }
 
 int AlveoGenericApp::program(const char *module) {
-  return 0;
+  return init_util(module);
 }
 
 int AlveoGenericApp::run() {

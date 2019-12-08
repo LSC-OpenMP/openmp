@@ -29,9 +29,7 @@
 #define TARGET_DEVICE GET_STRING(SDX_PLATFORM)
 #endif
 
-extern char *xclbin;
-
-int init_util();
+int init_util(const char *xclbin);
 void* data_alloc(int size);
 void data_submit(void *tgt_ptr, void *hst_ptr, int64_t size);
 int run_target();

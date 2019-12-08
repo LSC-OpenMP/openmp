@@ -47,7 +47,7 @@ int load_file_to_memory(const char *filename, char **result) {
   return size;
 }
 
-int init_util() {
+int init_util(const char *xclbin) {
   // get all platforms and then select xilinx platform
   cl_platform_id platforms[16];
   cl_uint platform_count;
@@ -160,16 +160,28 @@ int init_util() {
   //------------------------------------------------------------------------------
   // xclbin
   //------------------------------------------------------------------------------
-  printf("INFO: loading xclbin %s\n", "binary_container_1.xclbin");
+  const char *extension = ".xclbin";
 
-  int n_i0 = load_file_to_memory("binary_container_1.xclbin", (char **) &kernelbinary);
+  char *name_binary;
+
+  name_binary = (char*) malloc (strlen(xclbin) + strlen(extension) + 1);
+
+  strcpy(name_binary, xclbin);
+  strcat(name_binary, extension);
+
+  printf("INFO: loading xclbin %s\n", name_binary);
+
+  // int n_i0 = load_file_to_memory("loopback.xclbin", (char **) &kernelbinary);
+  int n_i0 = load_file_to_memory(name_binary, (char **) &kernelbinary);
 
   if (n_i0 < 0) {
-    printf("failed to load kernel from xclbin: %s\n", xclbin);
+    printf("failed to load kernel from xclbin: %s\n", name_binary);
     printf("Test failed\n");
 
     return OFFLOAD_FAIL;
   }
+
+  free(name_binary);
 
   size_t n0 = n_i0;
 
@@ -203,7 +215,7 @@ int init_util() {
   }
 
   // create the compute kernel in the program we wish to run
-  kernel = clCreateKernel(program, "hip", &err);
+  kernel = clCreateKernel(program, "hardcloud_top", &err);
 
   if (!kernel || err != CL_SUCCESS) {
     printf("Error: Failed to create compute kernel!\n");
