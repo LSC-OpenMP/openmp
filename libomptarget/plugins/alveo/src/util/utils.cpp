@@ -1,22 +1,20 @@
 #include "utils.h"
 
-int err;                       // error code returned from api calls
+struct buffer_t {
+  cl::Buffer buffer;
+  int* ptr;
+};
 
-cl_platform_id   platform_id;  // platform id
-cl_device_id     device_id;    // compute device id
-cl_context       context;      // compute context
-cl_command_queue commands;     // compute command queue
-cl_program       program;      // compute programs
-cl_kernel        kernel;       // compute kernel
-cl_mem_ext_ptr_t mem_ext;      // define memory bank
+cl::Device                device;
+std::vector<cl::Device>   devices;
+std::vector<cl::Platform> platforms;
+cl::Kernel                kernel;
+cl::Context               *context;
+cl::CommandQueue          *q;
 
-int counter_mem_flags;
+int narg;
 
-char cl_platform_vendor[1001];
-char target_device_name[1001] = TARGET_DEVICE;
-
-std::vector<cl_mem>  clmem_ptrs;     // buffers pointers
-std::vector<cl_uint> scalars_values; // buffers sizes
+std::vector<buffer_t> buffers;
 
 int load_file_to_memory(const char *filename, char **result) {
   int size = 0;
@@ -48,295 +46,128 @@ int load_file_to_memory(const char *filename, char **result) {
 }
 
 int init_util(const char *xclbin) {
-  // get all platforms and then select xilinx platform
-  cl_platform_id platforms[16];
-  cl_uint platform_count;
-  int platform_found = 0;
+  bool found_device = false;
 
-  err = clGetPlatformIDs(16, platforms, &platform_count);
+  //traversing all Platforms To find Xilinx Platform and targeted
 
-  if (err != CL_SUCCESS) {
-    printf("Error: Failed to find an OpenCL platform!\n");
-    printf("Test failed\n");
+  //Device in Xilinx Platform
+  cl::Platform::get(&platforms);
 
-    return OFFLOAD_FAIL;
-  }
+  for (size_t i = 0; (i < platforms.size() ) & (found_device == false); i++) {
+    cl::Platform platform = platforms[i];
+    std::string platformName = platform.getInfo<CL_PLATFORM_NAME>();
 
-  printf("INFO: Found %d platforms\n", platform_count);
+    if (platformName == "Xilinx") {
+      devices.clear();
+      platform.getDevices(CL_DEVICE_TYPE_ACCELERATOR, &devices);
 
-  // find xilinx plaftorm
-  for (unsigned int iplat = 0; iplat < platform_count; iplat++) {
-    err = clGetPlatformInfo(platforms[iplat], CL_PLATFORM_VENDOR, 1000, (void *)cl_platform_vendor,NULL);
+      if (devices.size()) {
+        device = devices[0];
+        found_device = true;
 
-    if (err != CL_SUCCESS) {
-      printf("Error: clGetPlatformInfo(CL_PLATFORM_VENDOR) failed!\n");
-      printf("Test failed\n");
-
-      return OFFLOAD_FAIL;
-    }
-
-    if (strcmp(cl_platform_vendor, "Xilinx") == 0) {
-      printf("INFO: Selected platform %d from %s\n", iplat, cl_platform_vendor);
-      platform_id = platforms[iplat];
-      platform_found = 1;
+        break;
+      }
     }
   }
 
-  if (!platform_found) {
-    printf("ERROR: Platform Xilinx not found. Exit.\n");
+  if (found_device == false) {
+    std::cout << "Error: Unable to find Target Device " <<
+      device.getInfo<CL_DEVICE_NAME>() << std::endl;
 
     return OFFLOAD_FAIL;
   }
 
-  // get accelerator compute device
-  cl_uint num_devices;
-  unsigned int device_found = 0;
-  cl_device_id devices[16];  // compute device id
-  char cl_device_name[1001];
+  // Creating Context and Command Queue for selected device
+  context = new cl::Context(device);
+  q = new cl::CommandQueue(*context, device, CL_QUEUE_PROFILING_ENABLE);
 
-  err = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_ACCELERATOR, 16, devices, &num_devices);
-
-  printf("INFO: Found %d devices\n", num_devices);
-
-  if (err != CL_SUCCESS) {
-    printf("ERROR: Failed to create a device group!\n");
-    printf("ERROR: Test failed\n");
-
-    return OFFLOAD_FAIL;
-  }
-
-  // iterate all devices to select the target device.
-  for (uint i = 0; i < num_devices; i++) {
-    err = clGetDeviceInfo(devices[i], CL_DEVICE_NAME, 1024, cl_device_name, 0);
-
-    if (err != CL_SUCCESS) {
-      printf("Error: Failed to get device name for device %d!\n", i);
-      printf("Test failed\n");
-
-      return OFFLOAD_FAIL;
-    }
-
-    printf("CL_DEVICE_NAME %s\n", cl_device_name);
-
-    if(strcmp(cl_device_name, target_device_name) == 0) {
-      device_id = devices[i];
-      device_found = 1;
-      printf("Selected %s as the target device\n", cl_device_name);
-    }
-  }
-
-  if (!device_found) {
-    printf("Target device %s not found. Exit.\n", target_device_name);
-
-    return OFFLOAD_FAIL;
-  }
-
-  // create a compute context
-  context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
-
-  if (!context) {
-    printf("Error: Failed to create a compute context!\n");
-    printf("Test failed\n");
-
-    return OFFLOAD_FAIL;
-  }
-
-  commands = clCreateCommandQueue(context, device_id, 0, &err);
-
-  if (!commands) {
-    printf("Error: Failed to create commands!\n");
-    printf("Error: code %i\n",err);
-    printf("Test failed\n");
-
-    return OFFLOAD_FAIL;
-  }
-
-  int status;
-
-  // create program objects
-  // load binary from disk
-  unsigned char *kernelbinary;
-
-  //------------------------------------------------------------------------------
-  // xclbin
-  //------------------------------------------------------------------------------
+  // Load xclbin
   const char *extension = ".xclbin";
 
-  char *name_binary;
+  char *filename_binary;
 
-  name_binary = (char*) malloc (strlen(xclbin) + strlen(extension) + 1);
+  filename_binary = (char*) malloc (strlen(xclbin) + strlen(extension) + 1);
 
-  strcpy(name_binary, xclbin);
-  strcat(name_binary, extension);
+  strcpy(filename_binary, xclbin);
+  strcat(filename_binary, extension);
 
-  printf("INFO: loading xclbin %s\n", name_binary);
+  std::cout << "Loading: '" << filename_binary << "'\n";
 
-  // int n_i0 = load_file_to_memory("loopback.xclbin", (char **) &kernelbinary);
-  int n_i0 = load_file_to_memory(name_binary, (char **) &kernelbinary);
+  std::ifstream bin_file(filename_binary, std::ifstream::binary);
 
-  if (n_i0 < 0) {
-    printf("failed to load kernel from xclbin: %s\n", name_binary);
-    printf("Test failed\n");
+  bin_file.seekg(0, bin_file.end);
+  unsigned nb = bin_file.tellg();
+  bin_file.seekg(0, bin_file.beg);
 
-    return OFFLOAD_FAIL;
-  }
+  char *buf = new char [nb];
 
-  free(name_binary);
+  bin_file.read(buf, nb);
 
-  size_t n0 = n_i0;
+  // Creating Program from Binary File
+  cl::Program::Binaries bins;
 
-  // create the compute program from offline
+  bins.push_back({buf, nb});
+  devices.resize(1);
 
-  program = clCreateProgramWithBinary(context, 1, &device_id, &n0,
-      (const unsigned char **) &kernelbinary, &status, &err);
+  cl::Program program(*context, devices, bins);
 
-  if ((!program) || (err != CL_SUCCESS)) {
-    printf("Error: Failed to create compute program from binary %d!\n", err);
-    printf("Test failed\n");
-
-    return OFFLOAD_FAIL;
-  }
-
-  // build the program executable
-  err = clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
-
-  if (err != CL_SUCCESS) {
-    size_t len;
-    char buffer[2048];
-
-    printf("Error: Failed to build program executable!\n");
-
-    clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
-
-    printf("%s\n", buffer);
-    printf("Test failed\n");
-
-    return OFFLOAD_FAIL;
-  }
-
-  // create the compute kernel in the program we wish to run
-  kernel = clCreateKernel(program, "hardcloud_top", &err);
-
-  if (!kernel || err != CL_SUCCESS) {
-    printf("Error: Failed to create compute kernel!\n");
-    printf("Test failed\n");
-
-    return OFFLOAD_FAIL;
-  }
-
-  mem_ext.obj = NULL;
-  mem_ext.param = kernel;
-
-  counter_mem_flags = 3;
+  // This call will get the kernel object from program. A kernel is an
+  // OpenCL function that is executed on the FPGA.
+  cl::Kernel kernel(program, "hardcloud_top");
 
   return OFFLOAD_SUCCESS;
 }
 
 void* data_alloc(int size) {
-  mem_ext.flags = counter_mem_flags;
+  cl::Buffer buffer(*context, CL_MEM_READ_WRITE, size);
 
-  counter_mem_flags = counter_mem_flags - 1;
+  // set the kernel arguments
+  kernel.setArg(narg++, buffer);
 
-  cl_mem dt = clCreateBuffer(context,  CL_MEM_READ_WRITE | CL_MEM_EXT_PTR_XILINX,
-      size, &mem_ext, NULL);
+  // we then need to map our opencl buffers to get the pointers
+  int *ptr = (int *) q->enqueueMapBuffer(buffer, CL_TRUE, CL_MAP_WRITE | CL_MAP_READ, 0, size);
 
-  if (!(dt)) {
+  if (!(ptr)) {
     printf("Error: Failed to allocate device memory!\n");
     printf("Test failed\n");
   }
 
-  clmem_ptrs.push_back(dt);
-  scalars_values.push_back((cl_uint) size);
+  buffer_t tmp = {buffer, ptr};
 
-  return (void*) dt;
+  buffers.push_back(tmp);
+
+  return (void*) ptr;
 }
 
 void data_submit(void *tgt_ptr, void *hst_ptr, int64_t size) {
-  err = clEnqueueWriteBuffer(commands, (cl_mem) tgt_ptr, CL_TRUE, 0, sizeof(char) * size,
-      hst_ptr, 0, NULL, NULL);
-
-  if (err != CL_SUCCESS) {
-    printf("Error: Failed to submit data. tgt_ptr %p, hst_ptr %p, size %d!\n", tgt_ptr, hst_ptr, size);
-    printf("Test failed\n");
-  }
+  memcpy(tgt_ptr, hst_ptr, size);
 }
 
 int run_target() {
-  cl_uint args_counter = 0;
-
-  err = 0;
-
-  for(auto scl : scalars_values) {
-    err = clSetKernelArg(kernel, args_counter, sizeof(cl_uint), &scl);
-
-    if(err != CL_SUCCESS){
-      printf("Error: Failed to set kernel arguments! %d\n", err);
-      printf("Test failed\n");
-
-      return OFFLOAD_FAIL;
-    }
-
-    args_counter++;
-  }
-
-  args_counter = 3;
-  for(auto ptrs : clmem_ptrs) {
-    err = clSetKernelArg(kernel, args_counter, sizeof(cl_mem), &ptrs);
-
-    if(err != CL_SUCCESS) {
-      printf("Error: Failed to set kernel arguments! %d\n", err);
-      printf("Test failed\n");
-
-      return OFFLOAD_FAIL;
-    }
-
-    args_counter--;
-  }
-
-  // Execute the kernel over the entire range of our 1d input data set
-  // using the maximum number of work group items for this device
-  clFinish(commands);
-
-  err = clEnqueueTask(commands, kernel, 0, NULL, NULL);
-
-  if (err) {
-    printf("Error: Failed to execute kernel! %d\n", err);
-    printf("Test failed\n");
-
-    return OFFLOAD_FAIL;
-  }
+  q->enqueueTask(kernel);
 
   return OFFLOAD_SUCCESS;
 }
 
 void data_retrieve(void *hst_ptr, void *tgt_ptr, int size) {
-  cl_event readevent;
 
-  clFinish(commands);
-
-  err = 0;
-  err |= clEnqueueReadBuffer(commands, (cl_mem) tgt_ptr, CL_TRUE, 0, size, hst_ptr, 0, NULL, &readevent);
-
-  if (err != CL_SUCCESS) {
-    printf("Error: Failed to read output array! %d\n", err);
-    printf("Test failed\n");
+  for (auto data : buffers) {
+    if (data.ptr == (int *) tgt_ptr)
+      q->enqueueMigrateMemObjects({data.buffer}, CL_MIGRATE_MEM_OBJECT_HOST);
   }
 
-  clWaitForEvents(1, &readevent);
+  memcpy(hst_ptr, tgt_ptr, size);
+
+  q->finish();
 }
 
 void data_delete(void *tgt_ptr) {
-  printf("%s\n", "UTILS INFO: calling data_delete \n");
-
-  clReleaseMemObject((cl_mem)tgt_ptr);
+  for (auto data : buffers) {
+    q->enqueueUnmapMemObject(data.buffer, data.ptr);
+  }
 }
 
 void cleanup() {
-  printf("%s\n", "UTILS INFO: calling cleanup \n");
-
-  clReleaseProgram(program);
-  clReleaseKernel(kernel);
-  clReleaseCommandQueue(commands);
-  clReleaseContext(context);
+  q->finish();
 }
 
