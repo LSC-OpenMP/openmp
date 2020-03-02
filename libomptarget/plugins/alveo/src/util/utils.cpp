@@ -1,14 +1,17 @@
 #include "utils.h"
 
 struct buffer_t {
+  int size;
+  int status;
+  void* ptr;
+  void* fake_ptr;
   cl::Buffer buffer;
-  int* ptr;
 };
 
 cl::Device                device;
 std::vector<cl::Device>   devices;
 std::vector<cl::Platform> platforms;
-cl::Kernel                kernel;
+cl::Kernel                *kernel;
 cl::Context               *context;
 cl::CommandQueue          *q;
 
@@ -113,52 +116,94 @@ int init_util(const char *xclbin) {
 
   // This call will get the kernel object from program. A kernel is an
   // OpenCL function that is executed on the FPGA.
-  cl::Kernel kernel(program, "hardcloud_top");
+  kernel = new cl::Kernel(program, "hardcloud_top");
 
   return OFFLOAD_SUCCESS;
 }
 
 void* data_alloc(int size) {
-  cl::Buffer buffer(*context, CL_MEM_READ_WRITE, size);
+  static int buffer_id = 0;
 
-  // set the kernel arguments
-  kernel.setArg(narg++, buffer);
+  void* ptr;
 
-  // we then need to map our opencl buffers to get the pointers
-  int *ptr = (int *) q->enqueueMapBuffer(buffer, CL_TRUE, CL_MAP_WRITE | CL_MAP_READ, 0, size);
+  // fake pointer
+  ptr = (void *) buffer_id++;
 
-  if (!(ptr)) {
-    printf("Error: Failed to allocate device memory!\n");
-    printf("Test failed\n");
-  }
-
-  buffer_t tmp = {buffer, ptr};
+  buffer_t tmp = {size, 0 /* unmapped */, nullptr, ptr, (cl::Buffer) NULL};
 
   buffers.push_back(tmp);
 
-  return (void*) ptr;
+  return ptr;
 }
 
 void data_submit(void *tgt_ptr, void *hst_ptr, int64_t size) {
+  cl::Buffer buffer(*context, CL_MEM_READ_ONLY, size);
+
+  // set the kernel arguments
+  kernel->setArg(narg++, buffer);
+
+  int id = -1;
+  for (int i = 0; i < buffers.size(); i++) {
+    if (buffers[i].fake_ptr == tgt_ptr) {
+      id = i;
+
+      break;
+    }
+  }
+
+  if (id == -1)
+    return;
+
+  // we then need to map our opencl buffers to get the pointers and
+  // update the tgt_ptr
+  tgt_ptr = q->enqueueMapBuffer(buffer, CL_TRUE, CL_MAP_WRITE, 0, size);
+
+  buffers[id].ptr = tgt_ptr;
+  buffers[id].buffer = buffer;
+  buffers[id].status = 1; // write
+
   memcpy(tgt_ptr, hst_ptr, size);
+
+  q->enqueueMigrateMemObjects({buffers[id].buffer}, 0);
 }
 
 int run_target() {
-  q->enqueueTask(kernel);
+  // create read buffers
+  for (int i = 0; i < buffers.size(); i++) {
+    if (0 == buffers[i].status) {
+      cl::Buffer buffer(*context, CL_MEM_WRITE_ONLY, buffers[i].size);
+
+      kernel->setArg(narg++, buffer);
+
+      buffers[i].ptr = q->enqueueMapBuffer(buffer, CL_TRUE, CL_MAP_READ, 0, buffers[i].size);
+      buffers[i].buffer = buffer;
+      buffers[i].status = 2; // read
+    }
+  }
+
+  // run
+  q->enqueueTask(*kernel);
+
+  // copy read buffers to user space
+  for (int i = 0; i < buffers.size(); i++) {
+    if (2 == buffers[i].status) {
+      q->enqueueMigrateMemObjects({buffers[i].buffer}, CL_MIGRATE_MEM_OBJECT_HOST);
+    }
+  }
+
+  q->finish();
 
   return OFFLOAD_SUCCESS;
 }
 
 void data_retrieve(void *hst_ptr, void *tgt_ptr, int size) {
-
   for (auto data : buffers) {
-    if (data.ptr == (int *) tgt_ptr)
-      q->enqueueMigrateMemObjects({data.buffer}, CL_MIGRATE_MEM_OBJECT_HOST);
+    if (data.fake_ptr == tgt_ptr && 2 == data.status) {
+      tgt_ptr = data.ptr;
+    }
   }
 
   memcpy(hst_ptr, tgt_ptr, size);
-
-  q->finish();
 }
 
 void data_delete(void *tgt_ptr) {
